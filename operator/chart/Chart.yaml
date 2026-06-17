@@ -1,0 +1,14 @@
+apiVersion: v2
+name: distributed-training-operator
+description: Kubernetes operator that automates the full lifecycle of distributed ML training jobs on GKE
+type: application
+version: 0.1.0
+appVersion: "v0.1.0"
+keywords:
+  - kubernetes
+  - operator
+  - machine-learning
+  - distributed-training
+  - pytorch
+sources:
+  - https://github.com/JonMukaj/distributed-training-operator

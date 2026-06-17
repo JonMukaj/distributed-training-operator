@@ -1,0 +1,37 @@
+# GKE-specific values
+# Usage:
+#   helm install distributed-training-operator \
+#     oci://ghcr.io/jmukaj/charts/distributed-training-operator \
+#     -f values-gke.yaml \
+#     -n distributed-training-system --create-namespace
+
+image:
+  # Always pull so the node always gets the latest pushed tag after a redeploy
+  pullPolicy: Always
+
+# Workload Identity annotation — lets the operator pod impersonate gke-cluster-sa
+# via the GKE metadata server without a key file.
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: gke-cluster-sa@praktikum2-494215.iam.gserviceaccount.com
+
+# GKE uses plain HTTP metrics on :8080 (no TLS inside the cluster).
+# The Prometheus ServiceMonitor scrapes this endpoint.
+metrics:
+  port: 8080
+  secure: false
+
+# GKE-specific manager flags pinned to the Praktikum 2 cluster.
+# To reuse on a different cluster, update --gcp-project, --gcp-location,
+# --cluster-name, and --node-service-account accordingly.
+extraArgs:
+  - --cloud-provider=gke
+  - --gcp-project=praktikum2-494215
+  - --gcp-location=us-east1-d
+  - --cluster-name=praktikum2
+  - --node-service-account=gke-cluster-sa@praktikum2-494215.iam.gserviceaccount.com
+  - --default-cpu-machine-type=e2-standard-4
+  - --default-gpu-machine-type=n1-standard-4
+  - --default-disk-size-gb=30
+  - --machine-costs-configmap=machine-costs
+  - --machine-costs-namespace=distributed-training-system

@@ -1,0 +1,17 @@
+project_id     = "praktikum-475820"
+# project_id     = "jmukaj-praktikum1"
+cluster_name   = "praktikum1"
+region         = "us-east1"
+zone           = "us-east1-d"
+environment    = "production"
+node_count     = 2
+min_node_count = 2
+max_node_count = 2
+disk_size_gb   = 100
+machine_type   = "e2-standard-2"
+assignment     = "praktikum1"
+use_gpu        = true
+worker_machine_type = "g2-standard-8"
+gpu_type    = "nvidia-l4"
+worker_node_count = 1
+worker_disk_type = "pd-ssd"

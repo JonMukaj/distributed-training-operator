@@ -1,0 +1,29 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/JonMukaj/distributed-training-operator
+  pullPolicy: IfNotPresent
+  # Defaults to .Chart.AppVersion when empty
+  tag: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Enable leader election for HA (always true in production)
+leaderElect: true
+
+serviceAccount:
+  # Annotations added to the ServiceAccount — use for Workload Identity on GKE
+  annotations: {}
+
+metrics:
+  port: 8443
+  secure: true
+
+# Extra flags passed verbatim to the manager binary (e.g. --cloud-provider, --gcp-project)
+extraArgs: []

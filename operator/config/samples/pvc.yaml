@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Shared output storage — apply once per cluster before submitting any job.
+#
+# Backed by the NFS server deployed in the default namespace, which is itself
+# backed by the GCP persistent disk (nfs-disk). All jobs that reference this
+# PVC share the same /exports directory on the NFS server, so:
+#   - HF model weights downloaded on run 1 are cached for run 2+
+#   - Checkpoints written by a failed run are available for resumeFromCheckpoint
+#
+# Apply:
+#   kubectl apply -f config/samples/pvc.yaml
+#
+# Then reference in any DistributedTraining:
+#   spec:
+#     outputPVCName: distributed-training-output-pvc
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: distributed-training-output-pv
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  claimRef:
+    name: distributed-training-output-pvc
+    namespace: default
+  nfs:
+    server: nfs-server.default.svc.cluster.local
+    path: "/"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: distributed-training-output-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: distributed-training-output-pv

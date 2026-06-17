@@ -1,0 +1,380 @@
+# distributed-training-operator
+
+A Kubernetes operator for running distributed machine-learning training jobs on GKE.
+It provisions ephemeral node pools, submits PyTorch (Kubeflow) or Spark workloads,
+monitors their execution, and tears down the infrastructure once training completes.
+
+## Description
+
+`distributed-training-operator` manages the full lifecycle of a `DistributedTraining` custom resource:
+
+1. **Pending** — validates the spec and, in objective mode, runs a cost/time solver to determine the optimal node count.
+2. **Provisioning** — creates an ephemeral GKE node pool sized for the workload.
+3. **Ready** — waits for nodes to become schedulable, then submits the backend job (PyTorchJob, SparkApplication, or plain batch/v1 Job).
+4. **Running** — monitors pod logs and backend job status.
+5. **Collecting** — scrapes training metrics (loss, throughput, cost) and writes them to `status.results`.
+6. **Succeeded / Failed** — deletes the node pool and records the final state.
+
+The operator supports a pluggable cloud provider interface, making it straightforward to add EKS or AKS backends alongside the built-in GKE provider.
+
+## Getting Started
+
+### Prerequisites
+
+- go version v1.24.6+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
+
+### To Deploy on the cluster
+
+**Build and push your image to the location specified by `IMG`:**
+
+```sh
+make docker-build docker-push IMG=<some-registry>/operator:tag
+```
+
+**NOTE:** This image ought to be published in the personal registry you specified.
+And it is required to have access to pull the image from the working environment.
+Make sure you have the proper permission to the registry if the above commands don’t work.
+
+**Install the CRDs into the cluster:**
+
+```sh
+make install
+```
+
+**Deploy the Manager to the cluster with the image specified by `IMG`:**
+
+```sh
+make deploy IMG=<some-registry>/operator:tag
+```
+
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
+privileges or be logged in as admin.
+
+### Deploying on GKE
+
+The operator uses a Kustomize overlay at `config/overlays/gke/` that injects GKE-specific
+flags and wires up Workload Identity so no credential files are needed inside the pod.
+
+**1. Enable Workload Identity on your cluster** (if not already enabled):
+
+```sh
+gcloud container clusters update YOUR_CLUSTER_NAME \
+  --workload-pool=YOUR_PROJECT.svc.id.goog \
+  --region=us-east1
+```
+
+**2. Create a GCP service account with node pool permissions:**
+
+```sh
+gcloud iam service-accounts create distributed-training-operator \
+  --display-name="Distributed Job Operator"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT \
+  --role=roles/container.nodeAdmin \
+  --member=serviceAccount:distributed-training-operator@YOUR_PROJECT.iam.gserviceaccount.com
+```
+
+**3. Bind the GCP service account to the Kubernetes service account:**
+
+```sh
+gcloud iam service-accounts add-iam-policy-binding \
+  distributed-training-operator@YOUR_PROJECT.iam.gserviceaccount.com \
+  --role=roles/iam.workloadIdentityUser \
+  --member="serviceAccount:YOUR_PROJECT.svc.id.goog[operator-system/operator-controller-manager]"
+```
+
+**4. Fill in your project and cluster values** in the overlay patch files:
+
+- `config/overlays/gke/manager_args_patch.yaml` — set `--gcp-project` and `--cluster-name`
+
+**5. Deploy using the GKE overlay:**
+
+```sh
+# Preview what will be applied
+kubectl kustomize config/overlays/gke
+
+# Apply
+kubectl apply -k config/overlays/gke
+```
+
+#### Adding support for another cloud provider
+
+The overlay pattern is designed to extend. To add a new provider (e.g. EKS, AKS):
+
+1. Implement `cloud.Provider` in `internal/cloud/<provider>/`
+2. Add provider flags and a `case` in `cmd/main.go`
+3. Create `config/overlays/<provider>/` with:
+   - `kustomization.yaml` referencing `../../default`
+   - `manager_args_patch.yaml` with `--cloud-provider=<provider>` and its flags
+   - `serviceaccount_wi_patch.yaml` with the provider's workload-identity annotation
+
+**Create instances of your solution**
+You can apply the samples (examples) from the config/sample:
+
+```sh
+kubectl apply -k config/samples/
+```
+
+>**NOTE**: Ensure that the samples has default values to test it out.
+
+### To Uninstall
+
+**Delete the instances (CRs) from the cluster:**
+
+```sh
+kubectl delete -k config/samples/
+```
+
+**Delete the APIs(CRDs) from the cluster:**
+
+```sh
+make uninstall
+```
+
+**UnDeploy the controller from the cluster:**
+
+```sh
+make undeploy
+```
+
+## Project Distribution
+
+Following the options to release and provide this solution to the users.
+
+### By providing a bundle with all YAML files
+
+1. Build the installer for the image built and published in the registry:
+
+```sh
+make build-installer IMG=<some-registry>/operator:tag
+```
+
+**NOTE:** The makefile target mentioned above generates an `install.yaml`
+file in the dist directory. This file contains all the resources built
+with Kustomize, which are necessary to install this project without its
+dependencies.
+
+1. Using the installer
+
+Users can just run `kubectl apply -f <YAML-BUNDLE-URL>` to install the project, i.e.:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/operator/<tag or branch>/dist/install.yaml
+```
+
+### By providing a Helm Chart
+
+1. Build the chart using the optional helm plugin
+
+```sh
+kubebuilder edit --plugins=helm/v2-alpha
+```
+
+1. See that a chart was generated under `dist/chart`, and users
+can obtain this solution from there.
+
+**NOTE:** If you change the project, you need to update the Helm Chart
+using the same command above to sync the latest changes. Furthermore,
+if you create webhooks, you need to use the above command with
+the '--force' flag and manually ensure that any custom configuration
+previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
+is manually re-applied afterwards.
+
+## Development and Deployment on GKE
+
+This section covers the full flow for deploying the operator on a GKE cluster,
+from authentication through to running a sample `DistributedTraining`.
+
+---
+
+### Step 1 — Authenticate with GCP
+
+```sh
+gcloud auth login
+gcloud auth application-default login
+```
+
+Set the active project:
+
+```sh
+gcloud config set project <your-project-id>
+```
+
+---
+
+### Step 2 — Provision the GKE cluster
+
+If you are using the provided Terraform configuration:
+
+```sh
+terraform init
+terraform apply -var-file=<your-tfvars-file>
+```
+
+Alternatively, create a cluster manually via the GCP Console or `gcloud container clusters create`.
+
+---
+
+### Step 3 — Connect kubectl to the cluster
+
+Install the GKE auth plugin if not already present:
+
+```sh
+gcloud components install gke-gcloud-auth-plugin
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+```
+
+Fetch credentials:
+
+```sh
+gcloud container clusters get-credentials <your-cluster-name> \
+  --zone=<your-gcp-zone> \
+  --project=<your-project-id>
+```
+
+Verify:
+
+```sh
+kubectl get nodes
+```
+
+---
+
+### Step 4 — Configure the GKE overlay
+
+Fill in your project, cluster, zone, and service account in the overlay patch files before deploying.
+Copy the example and edit it, then apply the values:
+
+```sh
+cp config/overlays/gke/values.env.example config/overlays/gke/values.env
+# edit values.env with your real values, then:
+source config/overlays/gke/values.env
+sed -i "s/YOUR_PROJECT_ID/$GCP_PROJECT/g; s/YOUR_CLUSTER_NAME/$CLUSTER_NAME/g; \
+        s/YOUR_GCP_ZONE/$GCP_ZONE/g; s/YOUR_SERVICE_ACCOUNT/$SERVICE_ACCOUNT/g" \
+  config/overlays/gke/manager_args_patch.yaml \
+  config/overlays/gke/serviceaccount_wi_patch.yaml
+```
+
+---
+
+### Step 5 — Install CRDs and dependencies
+
+```sh
+make install
+```
+
+Install the Kubeflow Training Operator (required for `PyTorchJob` support):
+
+```sh
+kubectl apply -k "github.com/kubeflow/training-operator/manifests/overlays/standalone?ref=v1.7.0"
+kubectl wait --for=condition=Available deployment/training-operator -n kubeflow --timeout=120s
+```
+
+---
+
+### Step 6 — Deploy the controller
+
+The `gke-rebuild` Makefile target handles namespace creation, credential setup, image build/push, and deployment in one command:
+
+```sh
+make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
+```
+
+This runs the following steps internally:
+
+1. Creates the `operator-system` namespace (idempotent)
+2. Creates the `gcp-adc` secret from `~/.config/gcloud/application_default_credentials.json`
+3. Builds and pushes the Docker image
+4. Applies `config/overlays/gke/` via kubectl
+5. Rolls out the deployment and waits for it to be ready
+6. Deletes and re-applies the sample `DistributedTraining` CR
+
+> **NOTE:** The `gke-rebuild` target uses ADC credentials mounted as a Kubernetes secret.
+> If your cluster supports Workload Identity, you can skip the ADC secret and rely on the
+> `iam.gke.io/gcp-service-account` annotation in `config/overlays/gke/serviceaccount_wi_patch.yaml` instead.
+
+---
+
+### Step 7 — Watch the operator
+
+```sh
+# Watch phase transitions
+kubectl get dj -w
+
+# Tail controller logs
+kubectl logs -f -n operator-system deploy/operator-controller-manager
+```
+
+Expected phase sequence: `Pending → Provisioning → Ready → Running → Collecting → Succeeded`
+
+Check the node pool being created on GKE:
+
+```sh
+gcloud container node-pools list \
+  --cluster=<your-cluster-name> \
+  --zone=<your-gcp-zone> \
+  --project=<your-project-id>
+```
+
+---
+
+### Teardown
+
+To delete the controller, CRDs, and all CRs:
+
+```sh
+make gke-clean
+```
+
+To destroy the GKE cluster and all GCP infrastructure (if provisioned with Terraform):
+
+```sh
+terraform destroy -var-file=<your-tfvars-file>
+```
+
+---
+
+### Updating the GCP project ID
+
+If you need to point the controller at a different GCP project, update the overlay and redeploy:
+
+```sh
+sed -i 's/--gcp-project=.*/--gcp-project=<new-project-id>/' config/overlays/gke/manager_args_patch.yaml
+make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
+```
+
+---
+
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository and create a feature branch from `main`.
+2. Run `make test` and `make lint` before opening a PR — both must pass.
+3. Keep PRs focused: one feature or fix per PR.
+4. Add or update tests for any changed behaviour.
+5. Open a pull request with a clear description of what changed and why.
+
+**NOTE:** Run `make help` for more information on all potential `make` targets
+
+More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+
+## License
+
+Copyright 2026.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+<http://www.apache.org/licenses/LICENSE-2.0>
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+

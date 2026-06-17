@@ -1,0 +1,61 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "operator.fullname" . }}-manager
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: [configmaps, nodes, secrets]
+  verbs: [get, list, watch]
+- apiGroups: [""]
+  resources: [events]
+  verbs: [create, patch]
+- apiGroups: [""]
+  resources: [pods]
+  verbs: [create, delete, get, list, watch]
+- apiGroups: [""]
+  resources: [pods/exec]
+  verbs: [create]
+- apiGroups: [""]
+  resources: [pods/log]
+  verbs: [get]
+- apiGroups: [kubeflow.org]
+  resources: [pytorchjobs]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [sparkoperator.k8s.io]
+  resources: [sparkapplications]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [training.distributedtraining.io]
+  resources: [distributedtraininghistories, distributedtrainings]
+  verbs: [create, delete, get, list, patch, update, watch]
+- apiGroups: [training.distributedtraining.io]
+  resources: [distributedtrainings/finalizers]
+  verbs: [update]
+- apiGroups: [training.distributedtraining.io]
+  resources: [distributedtrainings/status]
+  verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "operator.fullname" . }}-metrics-auth
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+rules:
+- apiGroups: [authentication.k8s.io]
+  resources: [tokenreviews]
+  verbs: [create]
+- apiGroups: [authorization.k8s.io]
+  resources: [subjectaccessreviews]
+  verbs: [create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "operator.fullname" . }}-metrics-reader
+  labels:
+    {{- include "operator.labels" . | nindent 4 }}
+rules:
+- nonResourceURLs: ["/metrics"]
+  verbs: [get]

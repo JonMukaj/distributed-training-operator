@@ -1,0 +1,54 @@
+# Strategic-merge patch: injects GKE-specific flags into the manager container.
+#
+# Credential precedence (ADC chain, checked in order):
+#   1. GOOGLE_APPLICATION_CREDENTIALS env var — if set, uses that JSON key file.
+#      Uncomment the env/volumeMounts/volumes blocks below and create the secret:
+#        kubectl create secret generic gcp-adc \
+#          --from-file=application_default_credentials.json=$HOME/.config/gcloud/application_default_credentials.json \
+#          -n distributed-training-system
+#   2. Workload Identity (default) — GKE metadata server issues tokens automatically.
+#      No secret or env var needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        imagePullPolicy: Always
+        args:
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=:8080
+          - --metrics-secure=false
+          - --cloud-provider=gke
+          - --gcp-project=praktikum2-494215
+          - --gcp-location=us-east1-d
+          - --cluster-name=praktikum2
+          - --default-cpu-machine-type=e2-standard-4
+          - --default-gpu-machine-type=n1-standard-4
+          - --default-disk-size-gb=30
+          - --machine-costs-configmap=machine-costs
+          - --machine-costs-namespace=distributed-training-system
+          - --node-service-account=gke-cluster-sa@praktikum2-494215.iam.gserviceaccount.com
+
+          # - --zap-log-level=debug
+        # Uncomment to override Workload Identity with an explicit key file:
+        # env:
+        #   - name: GOOGLE_APPLICATION_CREDENTIALS
+        #     value: /var/secrets/google/application_default_credentials.json
+        # volumeMounts:
+        #   - name: gcp-adc
+        #     mountPath: /var/secrets/google
+        #     readOnly: true
+      # volumes:
+      #   - name: gcp-adc
+      #     secret:
+      #       secretName: gcp-adc
+
+# gke-cluster-sa@praktikum2-494215.iam.gserviceaccount.com
+# --gcp-project=praktikum2-494215
+# --gcp-location=us-east1-d
+# --cluster-name=praktikum2

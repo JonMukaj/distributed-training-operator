@@ -1,0 +1,226 @@
+# ---------------------------------------------------------------------------
+# Example 1 — Smoke test (simple Python job, no real training)
+#
+# Provisions a 1-node pool, runs a trivial Python script, then tears down.
+# Used to verify the full operator phase sequence without any ML dependencies.
+# ---------------------------------------------------------------------------
+# apiVersion: training.distributedtraining.io/v1
+# kind: DistributedTraining
+# metadata:
+#   labels:
+#     app.kubernetes.io/name: operator
+#     app.kubernetes.io/managed-by: kustomize
+#   name: distributedtraining-sample-2
+# spec:
+#   backend: pytorch
+#   hardware:
+#     type: cpu
+#     machineType: e2-standard-2
+#   topology:
+#     nodes: 1
+#     processesPerNode: 1
+#   model:
+#     name: test-model  # ignored — pytorchSpec.command is set
+#   dataset:
+#     name: test-dataset
+#     split: train
+#   training:
+#     batchSize: 4
+#     learningRate: "2e-5"
+#     epochs: 1
+#   pytorchSpec:
+#     workerReplicas: 0   # master only (single node)
+#     image: python:3.11-slim
+#     command:
+#       - python
+#       - -c
+#       - "import time; print('job running'); time.sleep(30); print('done')"
+#     resources:
+#       requests:
+#         cpu: "500m"
+#         memory: "512Mi"
+---
+# ---------------------------------------------------------------------------
+# Example 2 — Single-node CPU LLM fine-tuning
+#
+# Fine-tunes BEE-spoke-data/smol_llama-101M-GQA on the medical_meadow dataset
+# using LoRA + bf16 on a single CPU node. Based on fine-tune/backup_job_single.yaml
+# and fine-tune/data-chart/cpu-medical_meadow_values.yaml.
+#
+# pytorchSpec.command is NOT set — the operator builds the torchrun invocation
+# automatically from model/dataset/training/optimization fields.
+#
+# The PVC is mounted at /mnt/output inside every replica container:
+#   /mnt/output/checkpoints  — training checkpoints (--output_dir)
+#   /mnt/output/hf-cache     — Hugging Face model/dataset cache
+#
+# Prerequisites:
+#   1. NFS server running: kubectl apply -f fine-tune/nfs-server.yaml
+#   2. PVC created:        kubectl apply -f config/samples/pvc.yaml
+#   3. HF token secret (only needed for gated models):
+#        kubectl create secret generic hf-token-secret --from-literal=token=<your-token>
+# ---------------------------------------------------------------------------
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  name: distributedtraining-llm-cpu-6
+spec:
+  backend: pytorch
+  hardware:
+    type: cpu
+    machineType: "c4-highcpu-8"  # 4 vCPU / 16 GB — minimum for 101M param model
+  # topology:
+  #   nodes: 2                   # calibration run 1 — single node
+  #   # nodes: 2                   # calibration run 2 — two nodes
+  #   processesPerNode: 1
+  objective:
+    targetTime: "7m"
+    maxCost: "10"
+    maxNodes: 10      # solver picks node count based on 1- and 2-node history entries
+  outputPVCName: distributed-training-output-pvc
+  model:
+    name: BEE-spoke-data/smol_llama-101M-GQA
+    trainingScript: /workspace/scripts/finetune.py
+    # hfTokenSecret:             # uncomment for gated models
+    #   name: hf-token-secret
+    #   key: token
+  dataset:
+    name: medalpaca/medical_meadow_medical_flashcards
+    split: train
+    promptWithInput: "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request."
+    promptWithoutInput: "Below is an instruction that describes a task. Write a response that appropriately completes the request."
+  training:
+    batchSize: 4
+    learningRate: "2e-5"
+    epochs: 1
+    maxSteps: -1
+    gradAccumulationSteps: 1
+    maxGradNorm: "1.0"
+    validationSplit: "0.20"
+    warmupSteps: 50
+    loggingSteps: 10
+    saveTotalLimit: 2
+    saveStrategy: epoch
+    overwriteOutputDir: true
+    ddpBackend: gloo
+    ddpFindUnusedParameters: false
+    useFastTokenizer: false
+  optimization:
+    mixedPrecision: bf16
+    bf16FullEval: true
+    lora:
+      enabled: true
+      rank: 4
+      alpha: 8
+      dropout: "0.1"
+      targetModules:
+        - q_proj
+        - v_proj
+        - k_proj
+        - o_proj
+        - gate_proj
+        - up_proj
+        - down_proj
+  pytorchSpec:
+    image: jmukaj/cpu-fine-tuner-hf:v1.0.0
+    resources:
+      requests:
+        cpu: "4"
+        memory: "10Gi"
+      limits:
+        cpu: "4"
+        memory: "10Gi"
+---
+# ---------------------------------------------------------------------------
+# Example 3b — Resume after failure (checkpoint-aware)
+#
+# Use this when distributedtraining-llm-cpu-1 fails mid-training. The operator
+# injects --resume_from_checkpoint into the torchrun command, so training
+# continues from the last saved checkpoint rather than starting from scratch.
+#
+# How to find the checkpoint step:
+#   kubectl exec -it <nfs-server-pod> -- ls /exports/checkpoints/
+#   # e.g. checkpoint-500, checkpoint-1000  →  use the highest number
+#
+# The path is relative to --output_dir (/mnt/output/checkpoints), so
+# resumeFromCheckpoint: "checkpoint-500" resolves to
+# /mnt/output/checkpoints/checkpoint-500 inside the container.
+#
+# Prerequisites: same PVC as the failed run must still exist (pvc.yaml).
+# ---------------------------------------------------------------------------
+# apiVersion: training.distributedtraining.io/v1
+# kind: DistributedTraining
+# metadata:
+#   name: distributedtraining-llm-cpu-2
+# spec:
+#   backend: pytorch
+#   hardware:
+#     type: cpu
+#     machineType: e2-standard-2
+#   topology:
+#     nodes: 1
+#     processesPerNode: 1
+#   outputPVCName: distributed-training-output-pvc
+#   resumeFromCheckpoint: "checkpoint-500"   # replace with actual step number
+#   model:
+#     name: BEE-spoke-data/smol_llama-101M-GQA
+#     trainingScript: /workspace/scripts/finetune.py
+#   dataset:
+#     name: medalpaca/medical_meadow_medical_flashcards
+#     split: train
+#   training:
+#     batchSize: 4
+#     learningRate: "2e-5"
+#     epochs: 1
+#     gradAccumulationSteps: 1
+#     validationSplit: "0.20"
+#   optimization:
+#     mixedPrecision: bf16
+#     lora:
+#       enabled: true
+#       rank: 4
+#       alpha: 8
+#       dropout: "0.1"
+#       targetModules:
+#         - q_proj
+#         - v_proj
+#         - k_proj
+#         - o_proj
+#         - gate_proj
+#         - up_proj
+#         - down_proj
+#   pytorchSpec:
+#     workerReplicas: 0
+#     image: jmukaj/cpu-fine-tuner-hf:v1.0.0
+---
+# ---------------------------------------------------------------------------
+# Example 3 — Spark distributed data processing
+#
+# Runs a PySpark word-count job across 2 executor nodes on a 1-node pool.
+# Requires the Spark Operator and a "spark" ServiceAccount in the default namespace:
+#   kubectl create serviceaccount spark
+#   kubectl create clusterrolebinding spark-role \
+#     --clusterrole=edit --serviceaccount=default:spark
+# ---------------------------------------------------------------------------
+# apiVersion: training.distributedtraining.io/v1
+# kind: DistributedTraining
+# metadata:
+#   name: distributedtraining-spark-wordcount
+# spec:
+#   backend: spark
+#   hardware:
+#     type: cpu
+#     machineType: e2-standard-4
+#   topology:
+#     nodes: 1               # 1-node ephemeral pool
+#     processesPerNode: 2    # 2 executor cores per node
+#   sparkSpec:
+#     type: Python
+#     sparkVersion: "3.5.0"
+#     image: apache/spark-py:v3.5.0
+#     mainApplicationFile: "local:///opt/spark/examples/src/main/python/wordcount.py"
+#     arguments:
+#       - "gs://spark-public-data/shakespeare.txt"
+#     driverServiceAccount: spark
+#     driverMemory: "1g"
+#     executorMemory: "2g"
