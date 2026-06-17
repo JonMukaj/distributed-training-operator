@@ -313,45 +313,50 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 
 	args = append(args, "--output_dir=/mnt/output/checkpoints")
 
-	if spec.Training.BatchSize > 0 {
-		args = append(args, fmt.Sprintf("--per_device_train_batch_size=%d", spec.Training.BatchSize))
+	var t trainingv1.TrainingSpec
+	if spec.Training != nil {
+		t = *spec.Training
 	}
-	evalBatch := spec.Training.EvalBatchSize
+
+	if t.BatchSize > 0 {
+		args = append(args, fmt.Sprintf("--per_device_train_batch_size=%d", t.BatchSize))
+	}
+	evalBatch := t.EvalBatchSize
 	if evalBatch == 0 {
-		evalBatch = spec.Training.BatchSize
+		evalBatch = t.BatchSize
 	}
 	if evalBatch > 0 {
 		args = append(args, fmt.Sprintf("--per_device_eval_batch_size=%d", evalBatch))
 	}
-	if spec.Training.LearningRate != "" {
-		args = append(args, fmt.Sprintf("--learning_rate=%s", spec.Training.LearningRate))
+	if t.LearningRate != "" {
+		args = append(args, fmt.Sprintf("--learning_rate=%s", t.LearningRate))
 	}
-	if spec.Training.Epochs > 0 {
-		args = append(args, fmt.Sprintf("--num_train_epochs=%d", spec.Training.Epochs))
+	if t.Epochs > 0 {
+		args = append(args, fmt.Sprintf("--num_train_epochs=%d", t.Epochs))
 	}
-	args = append(args, fmt.Sprintf("--max_steps=%d", spec.Training.MaxSteps))
-	if spec.Training.GradAccumulationSteps > 0 {
-		args = append(args, fmt.Sprintf("--gradient_accumulation_steps=%d", spec.Training.GradAccumulationSteps))
+	args = append(args, fmt.Sprintf("--max_steps=%d", t.MaxSteps))
+	if t.GradAccumulationSteps > 0 {
+		args = append(args, fmt.Sprintf("--gradient_accumulation_steps=%d", t.GradAccumulationSteps))
 	}
-	if spec.Training.MaxGradNorm != "" {
-		args = append(args, fmt.Sprintf("--max_grad_norm=%s", spec.Training.MaxGradNorm))
+	if t.MaxGradNorm != "" {
+		args = append(args, fmt.Sprintf("--max_grad_norm=%s", t.MaxGradNorm))
 	}
-	if spec.Training.ValidationSplit != "" {
-		args = append(args, fmt.Sprintf("--validation_split_percentage=%s", spec.Training.ValidationSplit))
+	if t.ValidationSplit != "" {
+		args = append(args, fmt.Sprintf("--validation_split_percentage=%s", t.ValidationSplit))
 	}
-	if spec.Training.WarmupSteps > 0 {
-		args = append(args, fmt.Sprintf("--warmup_steps=%d", spec.Training.WarmupSteps))
+	if t.WarmupSteps > 0 {
+		args = append(args, fmt.Sprintf("--warmup_steps=%d", t.WarmupSteps))
 	}
-	if spec.Training.LoggingSteps > 0 {
-		args = append(args, fmt.Sprintf("--logging_steps=%d", spec.Training.LoggingSteps))
+	if t.LoggingSteps > 0 {
+		args = append(args, fmt.Sprintf("--logging_steps=%d", t.LoggingSteps))
 	}
-	if spec.Training.SaveTotalLimit > 0 {
-		args = append(args, fmt.Sprintf("--save_total_limit=%d", spec.Training.SaveTotalLimit))
+	if t.SaveTotalLimit > 0 {
+		args = append(args, fmt.Sprintf("--save_total_limit=%d", t.SaveTotalLimit))
 	}
-	if spec.Training.SaveStrategy != "" {
-		args = append(args, fmt.Sprintf("--save_strategy=%s", spec.Training.SaveStrategy))
+	if t.SaveStrategy != "" {
+		args = append(args, fmt.Sprintf("--save_strategy=%s", t.SaveStrategy))
 	}
-	if spec.Training.OverwriteOutputDir {
+	if t.OverwriteOutputDir {
 		args = append(args, "--overwrite_output_dir=True")
 	}
 
@@ -389,7 +394,7 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 	}
 
 	// DDP backend: explicit > default-by-hardware (gloo for CPU, nccl for GPU).
-	ddpBackend := spec.Training.DDPBackend
+	ddpBackend := t.DDPBackend
 	if ddpBackend == "" {
 		if gpu {
 			ddpBackend = "nccl"
@@ -399,16 +404,16 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 	}
 	args = append(args, fmt.Sprintf("--ddp_backend=%s", ddpBackend))
 
-	if spec.Training.DDPFindUnusedParameters != nil {
-		if *spec.Training.DDPFindUnusedParameters {
+	if t.DDPFindUnusedParameters != nil {
+		if *t.DDPFindUnusedParameters {
 			args = append(args, "--ddp_find_unused_parameters=True")
 		} else {
 			args = append(args, "--ddp_find_unused_parameters=False")
 		}
 	}
 
-	if spec.Training.UseFastTokenizer != nil {
-		if *spec.Training.UseFastTokenizer {
+	if t.UseFastTokenizer != nil {
+		if *t.UseFastTokenizer {
 			args = append(args, "--use_fast_tokenizer=True")
 		} else {
 			args = append(args, "--use_fast_tokenizer=False")

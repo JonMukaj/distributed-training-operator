@@ -203,7 +203,11 @@ func (in *DistributedTrainingSpec) DeepCopyInto(out *DistributedTrainingSpec) {
 	out.Hardware = in.Hardware
 	out.Topology = in.Topology
 	in.Optimization.DeepCopyInto(&out.Optimization)
-	in.Training.DeepCopyInto(&out.Training)
+	if in.Training != nil {
+		in, out := &in.Training, &out.Training
+		*out = new(TrainingSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Objective != nil {
 		in, out := &in.Objective, &out.Objective
 		*out = new(ObjectiveSpec)

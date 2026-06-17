@@ -461,7 +461,7 @@ type DistributedTrainingSpec struct {
 	// Training holds the standard hyperparameters.
 	// Optional LLM overlay for pytorch backend.
 	// +optional
-	Training TrainingSpec `json:"training,omitempty"`
+	Training *TrainingSpec `json:"training,omitempty"`
 
 	// OutputPVCName is the name of the PVC for checkpoints and result files.
 	// Must exist before the job is created.
