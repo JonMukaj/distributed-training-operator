@@ -190,8 +190,16 @@ func (in *DistributedTrainingSpec) DeepCopyInto(out *DistributedTrainingSpec) {
 		*out = new(SparkSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	in.Model.DeepCopyInto(&out.Model)
-	out.Dataset = in.Dataset
+	if in.Model != nil {
+		in, out := &in.Model, &out.Model
+		*out = new(ModelSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Dataset != nil {
+		in, out := &in.Dataset, &out.Dataset
+		*out = new(DatasetSpec)
+		**out = **in
+	}
 	out.Hardware = in.Hardware
 	out.Topology = in.Topology
 	in.Optimization.DeepCopyInto(&out.Optimization)

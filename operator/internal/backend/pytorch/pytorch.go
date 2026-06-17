@@ -272,9 +272,9 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 		processesPerNode = spec.Topology.ProcessesPerNode
 	}
 
-	trainingScript := spec.Model.TrainingScript
-	if trainingScript == "" {
-		trainingScript = "/workspace/finetune.py"
+	trainingScript := "/workspace/finetune.py"
+	if spec.Model != nil && spec.Model.TrainingScript != "" {
+		trainingScript = spec.Model.TrainingScript
 	}
 
 	args := []string{
@@ -286,19 +286,19 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 		trainingScript,
 	}
 
-	if spec.Model.Name != "" {
+	if spec.Model != nil && spec.Model.Name != "" {
 		args = append(args, fmt.Sprintf("--model_name_or_path=%s", spec.Model.Name))
 	}
-	if spec.Dataset.Name != "" {
+	if spec.Dataset != nil && spec.Dataset.Name != "" {
 		args = append(args, fmt.Sprintf("--dataset_name=%s", spec.Dataset.Name))
 		if spec.Dataset.Split != "" {
 			args = append(args, fmt.Sprintf("--dataset_split=%s", spec.Dataset.Split))
 		}
 		datasetCacheDir := spec.Dataset.CacheDirectory
 		if datasetCacheDir == "" {
-			cacheBase := spec.Model.CacheDir
-			if cacheBase == "" {
-				cacheBase = "/mnt/output/hf-cache"
+			cacheBase := "/mnt/output/hf-cache"
+			if spec.Model != nil && spec.Model.CacheDir != "" {
+				cacheBase = spec.Model.CacheDir
 			}
 			datasetCacheDir = cacheBase + "/datasets"
 		}
@@ -435,13 +435,15 @@ func buildEnvVars(job *trainingv1.DistributedTraining) []interface{} {
 	// All other env vars (HF cache paths, LD_PRELOAD, etc.) must be set on
 	// the DistributedTraining CR via spec.pytorchSpec.env so the operator stays
 	// image- and workload-agnostic.
-	if hft := job.Spec.Model.HFTokenSecret; hft != nil {
-		vars = append(vars, map[string]interface{}{
-			"name": "HF_TOKEN",
-			"valueFrom": map[string]interface{}{
-				"secretKeyRef": map[string]interface{}{"name": hft.Name, "key": hft.Key},
-			},
-		})
+	if job.Spec.Model != nil {
+		if hft := job.Spec.Model.HFTokenSecret; hft != nil {
+			vars = append(vars, map[string]interface{}{
+				"name": "HF_TOKEN",
+				"valueFrom": map[string]interface{}{
+					"secretKeyRef": map[string]interface{}{"name": hft.Name, "key": hft.Key},
+				},
+			})
+		}
 	}
 
 	// Append user-defined env vars from pytorchSpec.
