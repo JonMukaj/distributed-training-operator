@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/JonMukaj/distributed-training-operator
+  repository: ghcr.io/jonmukaj/distributed-training-operator
   pullPolicy: IfNotPresent
   # Defaults to .Chart.AppVersion when empty
   tag: ""

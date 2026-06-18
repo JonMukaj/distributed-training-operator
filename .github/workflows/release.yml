@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/distributed-training-operator
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   test:
@@ -55,6 +55,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase owner
+        run: echo "OWNER_LC=${OWNER,,}" >> $GITHUB_ENV
+        env:
+          OWNER: ${{ github.repository_owner }}
+
       - name: Install kustomize and controller-gen
         run: make kustomize controller-gen
 
@@ -88,7 +93,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | \
             helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
           helm push dist/distributed-training-operator-*.tgz \
-            oci://ghcr.io/${{ github.repository_owner }}/charts
+            oci://ghcr.io/${{ env.OWNER_LC }}/charts
 
       - name: Generate install manifest
         run: make build-installer IMG=${{ env.IMAGE }}:${{ github.ref_name }}
