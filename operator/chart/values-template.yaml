@@ -1,0 +1,130 @@
+# values-template.yaml — copy this file, fill in your values, and pass it with -f.
+#
+# Usage:
+#   helm install distributed-training-operator \
+#     oci://ghcr.io/jonmukaj/charts/distributed-training-operator \
+#     --version <version> \
+#     -f my-values.yaml \
+#     -n distributed-training-system --create-namespace
+
+# ---------------------------------------------------------------------------
+# Controller deployment
+# ---------------------------------------------------------------------------
+
+# Number of controller replicas.
+# Keep at 1 unless you enable leaderElect — only one replica actively reconciles at a time.
+replicaCount: 1
+
+image:
+  # Container image repository. Override only when mirroring to a private registry.
+  repository: ghcr.io/jonmukaj/distributed-training-operator
+
+  # Image pull policy.
+  # IfNotPresent: use the cached image if the tag already exists locally (recommended for pinned tags).
+  # Always: always pull — useful when using mutable tags like `latest`.
+  pullPolicy: IfNotPresent
+
+  # Image tag. Defaults to .Chart.AppVersion when empty.
+  # Pin to a specific version in production (e.g. "v0.2.0").
+  tag: ""
+
+# Compute resources for the controller manager pod.
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+# Enable leader election.
+# Required when replicaCount > 1 so only one pod reconciles at a time.
+# Safe to leave true even with a single replica.
+leaderElect: true
+
+# ---------------------------------------------------------------------------
+# Service account
+# ---------------------------------------------------------------------------
+
+serviceAccount:
+  # Annotations added to the controller ServiceAccount.
+  # Used to bind a cloud IAM identity without a key file.
+  #
+  # GKE Workload Identity example:
+  #   iam.gke.io/gcp-service-account: my-sa@my-project.iam.gserviceaccount.com
+  #
+  # AWS EKS IRSA example:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/my-role
+  annotations: {}
+
+# ---------------------------------------------------------------------------
+# Metrics
+# ---------------------------------------------------------------------------
+
+metrics:
+  # Port the metrics endpoint binds to.
+  # Use 8443 for HTTPS (default, production) or 8080 for plain HTTP (e.g. GKE in-cluster scraping).
+  port: 8443
+
+  # Serve metrics over HTTPS with authentication and authorisation.
+  # Set to false only in environments where TLS is handled externally.
+  secure: true
+
+# ---------------------------------------------------------------------------
+# Cloud provider
+# ---------------------------------------------------------------------------
+
+# All provider-specific configuration is passed via extraArgs.
+# The flags below map 1-to-1 to manager binary flags.
+# See the full flag reference in cmd/main.go.
+
+extraArgs:
+  # -- Required --
+
+  # Cloud provider for node pool lifecycle management.
+  # Currently supported: gke
+  - --cloud-provider=gke
+
+  # [gke] GCP project ID.
+  # Can also be set via the GCP_PROJECT environment variable.
+  - --gcp-project=my-project-id
+
+  # [gke] Region or zone of the GKE cluster (e.g. us-east1 or us-east1-d).
+  - --gcp-location=us-east1
+
+  # [gke] Name of the GKE cluster.
+  - --cluster-name=my-cluster
+
+  # -- Recommended --
+
+  # IAM service account email attached to operator-created node pools.
+  # Must have the roles/container.nodeServiceAccount role.
+  # Leave empty to use the cloud provider default compute SA (not recommended for production).
+  - --node-service-account=my-sa@my-project.iam.gserviceaccount.com
+
+  # -- Node pool defaults --
+  # These are used when spec.hardware.machineType is not set on a DistributedTraining CR.
+
+  # Default GCE machine type for CPU jobs.
+  - --default-cpu-machine-type=e2-standard-4
+
+  # Default GCE machine type for GPU jobs.
+  - --default-gpu-machine-type=n1-standard-4
+
+  # Default boot disk size in GB for ephemeral node pool nodes.
+  - --default-disk-size-gb=50
+
+  # -- Topology solver --
+
+  # Node count used for the first calibration run when no training history exists
+  # for a given job configuration (model + dataset + hyperparameters).
+  - --default-calibration-nodes=2
+
+  # -- Cost tracking --
+
+  # Name of the ConfigMap containing per-machine-type hourly costs.
+  # Used by the topology solver and attached to job results as estimatedCostUSD.
+  - --machine-costs-configmap=machine-costs
+
+  # Namespace where the machine costs ConfigMap lives.
+  - --machine-costs-namespace=distributed-training-system

@@ -75,6 +75,7 @@ jobs:
           context: operator
           platforms: linux/amd64,linux/arm64
           push: true
+          provenance: mode=min
           tags: |
             ${{ env.IMAGE }}:${{ github.ref_name }}
             ${{ env.IMAGE }}:latest
@@ -104,5 +105,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: operator/dist/install.yaml
+          files: |
+            operator/dist/install.yaml
+            operator/dist/*.tgz
+            operator/chart/values-template.yaml
           generate_release_notes: true
