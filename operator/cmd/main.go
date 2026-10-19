@@ -39,6 +39,7 @@ import (
 	"github.com/JonMukaj/distributed-training-operator/internal/backend/spark"
 	"github.com/JonMukaj/distributed-training-operator/internal/cloud"
 	"github.com/JonMukaj/distributed-training-operator/internal/cloud/gke"
+	"github.com/JonMukaj/distributed-training-operator/internal/cloud/hyperstack"
 	"github.com/JonMukaj/distributed-training-operator/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -79,6 +80,11 @@ func main() {
 		gcpProject  string
 		gcpLocation string
 		clusterName string
+
+		// Hyperstack-specific flags — only consumed when --cloud-provider=hyperstack.
+		hyperstackAPIURL        string
+		hyperstackClusterID     int
+		hyperstackNodePoolLabel string
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0",
@@ -99,7 +105,7 @@ func main() {
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers.")
 
 	flag.StringVar(&cloudProvider, "cloud-provider", "gke",
-		"Cloud provider for node pool management. Supported: gke")
+		"Cloud provider for node pool management. Supported: gke, hyperstack")
 	flag.StringVar(&defaultCPUMachineType, "default-cpu-machine-type", "e2-standard-4",
 		"Default GCE machine type for CPU jobs when spec.hardware.machineType is unset.")
 	flag.StringVar(&defaultGPUMachineType, "default-gpu-machine-type", "n1-standard-4",
@@ -122,6 +128,16 @@ func main() {
 		"[gke] GCP region or zone of the GKE cluster.")
 	flag.StringVar(&clusterName, "cluster-name", "",
 		"[gke] Name of the GKE cluster.")
+
+	// Hyperstack flags. The API key is read from the HYPERSTACK_API_KEY env var
+	// (sourced from a Kubernetes Secret) rather than a flag, to keep it out of
+	// the pod's command-line arguments.
+	flag.StringVar(&hyperstackAPIURL, "hyperstack-api-url", hyperstack.DefaultAPIURL,
+		"[hyperstack] Base URL of the Hyperstack core API.")
+	flag.IntVar(&hyperstackClusterID, "hyperstack-cluster-id", 0,
+		"[hyperstack] Numeric ID of the Hyperstack managed Kubernetes cluster.")
+	flag.StringVar(&hyperstackNodePoolLabel, "hyperstack-nodepool-label", hyperstack.DefaultNodePoolLabel,
+		"[hyperstack] Kubernetes node label that carries the node-group name, used to count ready nodes.")
 
 	opts := zap.Options{Development: false}
 	opts.BindFlags(flag.CommandLine)
@@ -170,7 +186,9 @@ func main() {
 	}
 
 	// Build the cloud provider — the only place in the binary with provider-specific logic.
-	provider, err := buildProvider(cloudProvider, gcpProject, gcpLocation, clusterName)
+	provider, err := buildProvider(cloudProvider,
+		gcpProject, gcpLocation, clusterName,
+		hyperstackAPIURL, hyperstackClusterID, hyperstackNodePoolLabel)
 	if err != nil {
 		setupLog.Error(err, "unable to initialise cloud provider", "provider", cloudProvider)
 		os.Exit(1)
@@ -243,7 +261,11 @@ func main() {
 //  1. Create internal/cloud/<name>/<name>.go implementing cloud.Provider
 //  2. Add a case below
 //  3. Add the provider-specific flags above
-func buildProvider(name, gcpProject, gcpLocation, clusterName string) (cloud.Provider, error) {
+func buildProvider(
+	name string,
+	gcpProject, gcpLocation, clusterName string,
+	hyperstackAPIURL string, hyperstackClusterID int, hyperstackNodePoolLabel string,
+) (cloud.Provider, error) {
 	switch name {
 	case "gke":
 		if gcpProject == "" {
@@ -254,6 +276,13 @@ func buildProvider(name, gcpProject, gcpLocation, clusterName string) (cloud.Pro
 		}
 		return gke.New(gcpProject, gcpLocation, clusterName)
 
+	case "hyperstack":
+		apiKey := os.Getenv("HYPERSTACK_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("HYPERSTACK_API_KEY env var is required for the hyperstack provider")
+		}
+		return hyperstack.New(hyperstackAPIURL, apiKey, hyperstackClusterID, hyperstackNodePoolLabel)
+
 	// case "eks":
 	//     return eks.New(awsRegion, clusterName)
 
@@ -261,6 +290,6 @@ func buildProvider(name, gcpProject, gcpLocation, clusterName string) (cloud.Pro
 	//     return aks.New(subscriptionID, resourceGroup, clusterName)
 
 	default:
-		return nil, fmt.Errorf("unsupported cloud provider %q — supported: gke", name)
+		return nil, fmt.Errorf("unsupported cloud provider %q — supported: gke, hyperstack", name)
 	}
 }

@@ -1,0 +1,44 @@
+# Strategic-merge patch: injects Hyperstack-specific flags into the manager
+# container and wires the API key in from a Kubernetes Secret.
+#
+# Create the API-key secret before deploying (key generated in the Hyperstack
+# console at https://console.hyperstack.cloud/api-keys):
+#
+#   kubectl create secret generic hyperstack-api \
+#     --from-literal=api-key=YOUR_HYPERSTACK_API_KEY \
+#     -n operator-system
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        imagePullPolicy: Always
+        args:
+          - --leader-elect
+          - --health-probe-bind-address=:8081
+          - --metrics-bind-address=:8080
+          - --metrics-secure=false
+          - --cloud-provider=hyperstack
+          - --hyperstack-cluster-id=YOUR_CLUSTER_ID
+          - --hyperstack-api-url=https://infrahub-api.nexgencloud.com/v1
+          # The node label that carries the node-group name. Verify this against
+          # your cluster's `kubectl get nodes --show-labels` and override if needed.
+          - --hyperstack-nodepool-label=hyperstack.cloud/node-group
+          # Hyperstack flavor names (see `List flavors` API) used when the CR does
+          # not pin spec.hardware.machineType.
+          - --default-cpu-machine-type=n1-cpu-small
+          - --default-gpu-machine-type=n1-cpu-small
+          - --machine-costs-configmap=machine-costs
+          - --machine-costs-namespace=distributed-training-system
+
+          # - --zap-log-level=debug
+        env:
+          - name: HYPERSTACK_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: hyperstack-api
+                key: api-key
