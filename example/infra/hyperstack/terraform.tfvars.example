@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit real values.
+#
+# The API key is NOT set here; export it instead:
+#   export HYPERSTACK_API_KEY=your-api-key-here
+
+cluster_name     = "distributed-training"
+environment_name = "your-hyperstack-environment"
+keypair_name     = "your-hyperstack-keypair"
+
+# Optional overrides (defaults shown):
+# kubernetes_version = "1.36.1"
+# image_name         = "Ubuntu Server 22.04 LTS R535 CUDA 12.2"
+# master_flavor_name = "n1-cpu-medium"
+# node_flavor_name   = "n1-cpu-medium"
+# node_count         = 1

@@ -1,8 +1,9 @@
 # distributed-training-operator
 
-A Kubernetes operator for running distributed machine-learning training jobs on GKE.
-It provisions ephemeral node pools, submits PyTorch (Kubeflow) or Spark workloads,
-monitors their execution, and tears down the infrastructure once training completes.
+A Kubernetes operator for running distributed machine-learning training jobs on GKE
+or Hyperstack. It provisions ephemeral node pools, submits PyTorch (Kubeflow) or Spark
+workloads, monitors their execution, and tears down the infrastructure once training
+completes.
 
 ## Table of Contents
 
@@ -269,6 +270,42 @@ kubectl kustomize config/overlays/gke
 kubectl apply -k config/overlays/gke
 ```
 
+#### Deploying on Hyperstack
+
+The operator also supports [Hyperstack](https://www.hyperstack.cloud/) (NexGen Cloud)
+managed Kubernetes clusters. Instead of GKE node pools it manages Hyperstack
+**node groups** via the core REST API.
+
+**1. Create an API key** in the [Hyperstack console](https://console.hyperstack.cloud/api-keys)
+and store it as a Kubernetes Secret (the operator reads it from `HYPERSTACK_API_KEY`,
+never from a command-line flag):
+
+```sh
+kubectl create secret generic hyperstack-api \
+  --from-literal=api-key=YOUR_HYPERSTACK_API_KEY \
+  -n operator-system
+```
+
+**2. Set your numeric cluster ID** in `config/overlays/hyperstack/manager_args_patch.yaml`
+(the `--hyperstack-cluster-id` flag).
+
+**3. Deploy using the Hyperstack overlay:**
+
+```sh
+kubectl kustomize config/overlays/hyperstack   # preview
+kubectl apply -k config/overlays/hyperstack
+```
+
+Notes and differences from GKE:
+
+- **Machine types are Hyperstack flavor names** (e.g. `n1-cpu-small`); a flavor bundles
+  its GPU, so `spec.hardware.gpuType`/`gpuCount` are ignored on Hyperstack.
+- Node-group names are limited to **20 characters**.
+- Readiness is observed by polling node status (`ACTIVE`) through the Hyperstack API.
+  The controller additionally counts Ready Kubernetes nodes using the
+  `--hyperstack-nodepool-label` label (default `hyperstack.cloud/node-group`) — verify
+  this against `kubectl get nodes --show-labels` on your cluster and override if needed.
+
 #### Adding support for another cloud provider
 
 The overlay pattern is designed to extend. To add a new provider (e.g. EKS, AKS):
@@ -278,7 +315,8 @@ The overlay pattern is designed to extend. To add a new provider (e.g. EKS, AKS)
 3. Create `config/overlays/<provider>/` with:
    - `kustomization.yaml` referencing `../../default`
    - `manager_args_patch.yaml` with `--cloud-provider=<provider>` and its flags
-   - `serviceaccount_wi_patch.yaml` with the provider's workload-identity annotation
+   - a service-account / credentials patch for the provider's auth (e.g. Workload
+     Identity on GKE, or an API-key Secret env var on Hyperstack)
 
 #### Create instances of your solution
 

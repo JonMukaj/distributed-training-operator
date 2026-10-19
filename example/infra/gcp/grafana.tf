@@ -6,7 +6,7 @@ variable "grafana_admin_password" {
 }
 
 locals {
-  dashboard_json = file("${path.module}/operator/config/grafana/distributedtraining-dashboard.json")
+  dashboard_json = file("${path.module}/../../../operator/config/grafana/distributedtraining-dashboard.json")
 }
 
 # Custom storage class with Retain reclaim policy so the underlying GCE

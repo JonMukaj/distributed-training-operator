@@ -1,0 +1,15 @@
+# Terraform state, caches, and secrets — never commit these.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Real variable files may hold environment/keypair names and secrets.
+# The committed templates are *.tfvars.example (and gcp/*.tfvars presets).
+terraform.tfvars
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

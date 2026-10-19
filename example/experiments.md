@@ -177,8 +177,8 @@ between runs.
 
 #### Step A — Provision GKE cluster + monitoring stack via Terraform
 
-A single `terraform apply` provisions everything in [infra/main.tf](infra/main.tf),
-[infra/network.tf](infra/network.tf), [infra/nfs.tf](infra/nfs.tf), and [infra/grafana.tf](infra/grafana.tf):
+A single `terraform apply` provisions everything in [infra/gcp/main.tf](infra/gcp/main.tf),
+[infra/gcp/network.tf](infra/gcp/network.tf), [infra/gcp/nfs.tf](infra/gcp/nfs.tf), and [infra/gcp/grafana.tf](infra/gcp/grafana.tf):
 
 - VPC + subnet
 - GKE cluster `praktikum2` (us-east1-d) with general-purpose node pool
@@ -190,7 +190,7 @@ A single `terraform apply` provisions everything in [infra/main.tf](infra/main.t
 - `distributed-training-system` namespace + the operator's metrics `Service` + `ServiceMonitor` so Prometheus scrapes the operator once it's deployed in Step E
 
 ```bash
-cd /home/jmukaj/Semester4/praktikum2/infra
+cd /home/jmukaj/Semester4/praktikum2/infra/gcp
 terraform init
 terraform apply -var-file=operator-cpu-small-kubeflow.tfvars
 ```
@@ -362,7 +362,7 @@ kubectl exec $(kubectl get pod -l role=nfs-server -o jsonpath='{.items[0].metada
 ### Step 1 — Provision node pool
 
 The worker pool is provisioned via `gcloud` (the `google_container_node_pool.worker`
-resource in [infra/main.tf:147-195](infra/main.tf#L147-L195) is kept commented during baseline runs).
+resource in [infra/gcp/main.tf:147-195](infra/gcp/main.tf#L147-L195) is kept commented during baseline runs).
 
 The script creates the pool, polls until both nodes show `Ready`, and writes
 `t_provision_start`, `t_provision_end`, and `provisioning_s` into `results/B-2-timings.txt`:
@@ -1392,7 +1392,7 @@ gcloud container node-pools delete praktikum2-worker-node-pool \
 
 # 3. Destroy everything provisioned by terraform (cluster, IAM, NFS disk,
 #    monitoring stack, Pushgateway, ServiceMonitor)
-cd infra && terraform destroy -var-file=operator-cpu-small-kubeflow.tfvars
+cd infra/gcp && terraform destroy -var-file=operator-cpu-small-kubeflow.tfvars
 
 # 4. Sanity check — no GKE clusters should remain in the project
 gcloud container clusters list --project praktikum2-494215
