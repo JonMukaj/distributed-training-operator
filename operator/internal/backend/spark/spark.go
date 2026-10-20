@@ -53,17 +53,17 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 	driverMemory, executorMemory := resolveMemory(sparkSpec)
 	nodeSel, tolerations := buildNodeSelector(job)
 
-	appSpec := map[string]interface{}{
+	appSpec := map[string]any{
 		"type":                sparkSpec.Type,
 		"sparkVersion":        sparkSpec.SparkVersion,
 		"mode":                "cluster",
 		"image":               sparkSpec.Image,
 		"imagePullPolicy":     "Always",
 		"mainApplicationFile": sparkSpec.MainApplicationFile,
-		"restartPolicy": map[string]interface{}{
+		"restartPolicy": map[string]any{
 			"type": "Never",
 		},
-		"driver": map[string]interface{}{
+		"driver": map[string]any{
 			"cores":          driverCores,
 			"memory":         driverMemory,
 			"nodeSelector":   nodeSel,
@@ -71,7 +71,7 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 			"serviceAccount": sparkSpec.DriverServiceAccount,
 			"volumeMounts":   buildVolumeMounts(job),
 		},
-		"executor": map[string]interface{}{
+		"executor": map[string]any{
 			"cores":        executorCores,
 			"instances":    executorInstances,
 			"memory":       executorMemory,
@@ -86,13 +86,13 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 	}
 
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "sparkoperator.k8s.io/v1beta2",
 			"kind":       "SparkApplication",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": job.Namespace,
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"app":                                 name,
 					"training.distributedtraining.io/job": job.Name,
 				},
@@ -226,18 +226,18 @@ func resolveMemory(s *trainingv1.SparkSpec) (string, string) {
 	return driverMemory, executorMemory
 }
 
-func buildArguments(s *trainingv1.SparkSpec) []interface{} {
-	args := make([]interface{}, len(s.Arguments))
+func buildArguments(s *trainingv1.SparkSpec) []any {
+	args := make([]any, len(s.Arguments))
 	for i, a := range s.Arguments {
 		args[i] = a
 	}
 	return args
 }
 
-func buildVolumeMounts(job *trainingv1.DistributedTraining) []interface{} {
-	mounts := []interface{}{}
+func buildVolumeMounts(job *trainingv1.DistributedTraining) []any {
+	mounts := []any{}
 	if job.Spec.OutputPVCName != "" {
-		mounts = append(mounts, map[string]interface{}{
+		mounts = append(mounts, map[string]any{
 			"name":      "output",
 			"mountPath": "/mnt/output",
 		})
@@ -245,18 +245,18 @@ func buildVolumeMounts(job *trainingv1.DistributedTraining) []interface{} {
 	return mounts
 }
 
-func buildVolumes(job *trainingv1.DistributedTraining) []interface{} {
-	volumes := []interface{}{}
+func buildVolumes(job *trainingv1.DistributedTraining) []any {
+	volumes := []any{}
 	if job.Spec.OutputPVCName != "" {
-		volumes = append(volumes, map[string]interface{}{
+		volumes = append(volumes, map[string]any{
 			"name":                  "output",
-			"persistentVolumeClaim": map[string]interface{}{"claimName": job.Spec.OutputPVCName},
+			"persistentVolumeClaim": map[string]any{"claimName": job.Spec.OutputPVCName},
 		})
 	}
 	return volumes
 }
 
-func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]interface{}, []interface{}) {
+func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
 	poolName := job.Spec.Hardware.NodePoolName
 	if poolName == "" {
 		if job.Spec.Hardware.Type == trainingv1.HardwareGPU {
@@ -265,9 +265,9 @@ func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]interfac
 			poolName = "cpu-pool"
 		}
 	}
-	nodeSelector := map[string]interface{}{"cloud.google.com/gke-nodepool": poolName}
-	tolerations := []interface{}{
-		map[string]interface{}{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
+	nodeSelector := map[string]any{"cloud.google.com/gke-nodepool": poolName}
+	tolerations := []any{
+		map[string]any{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
 	}
 	return nodeSelector, tolerations
 }

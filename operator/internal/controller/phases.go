@@ -244,7 +244,7 @@ func (r *DistributedTrainingReconciler) countReadyNodesInPool(
 	for _, node := range nodeList.Items {
 		conditions, _, _ := unstructured.NestedSlice(node.Object, "status", "conditions")
 		for _, c := range conditions {
-			cmap, ok := c.(map[string]interface{})
+			cmap, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -436,10 +436,7 @@ func (r *DistributedTrainingReconciler) reconcileCollecting(
 				logger.V(1).Info("could not fetch backend end time, falling back to time.Now()", "err", etErr)
 			}
 		}
-		duration := endTime.Sub(job.Status.TrainingStartTime.Time)
-		if duration < 0 {
-			duration = 0
-		}
+		duration := max(endTime.Sub(job.Status.TrainingStartTime.Time), 0)
 		trainingTimeStr = duration.Round(time.Second).String()
 	}
 

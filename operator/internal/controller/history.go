@@ -156,7 +156,7 @@ func (r *DistributedTrainingReconciler) pruneHistory(ctx context.Context, namesp
 	})
 
 	toDelete := len(list.Items) - historyRetentionLimit + 1 // +1 to make room for the new entry
-	for i := 0; i < toDelete; i++ {
+	for i := range toDelete {
 		item := list.Items[i]
 		if err := r.Delete(ctx, &item); err != nil {
 			return fmt.Errorf("deleting old history entry %s: %w", item.Name, err)

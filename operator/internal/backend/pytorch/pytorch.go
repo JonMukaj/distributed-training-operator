@@ -5,13 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"time"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"math"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	trainingv1 "github.com/JonMukaj/distributed-training-operator/api/v1"
 	"github.com/JonMukaj/distributed-training-operator/internal/backend"
@@ -70,18 +72,18 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 	nodeSel, tolerations := buildNodeSelector(job)
 
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kubeflow.org/v1",
 			"kind":       "PyTorchJob",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      name,
 				"namespace": job.Namespace,
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"app":                                 name,
 					"training.distributedtraining.io/job": job.Name,
 				},
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"pytorchReplicaSpecs": buildReplicaSpecs(masterReplicas, workerReplicas, ps.Image, command, args, envVars, volumes, volumeMounts, resources, nodeSel, tolerations),
 			},
 		},
@@ -175,16 +177,38 @@ type allResults struct {
 	TrainSamples          int     `json:"train_samples"`
 }
 
+// transferProfile maps the data-transfer breakdown written by the instrumented
+// training script to transfer_profile.json (see script.py / thesis Ch 4). It is
+// optional: a job that does not produce the file still collects its regular
+// results.
+type transferProfile struct {
+	AllReduceFraction     float64 `json:"allreduce_fraction"`
+	DataloadFraction      float64 `json:"dataload_fraction"`
+	ComputeFraction       float64 `json:"compute_fraction"`
+	TotalAllReduceS       float64 `json:"total_allreduce_s"`
+	GradSizeBytes         int64   `json:"grad_size_bytes"`
+	TotalAllReduceBytes   int64   `json:"total_allreduce_bytes"`
+	NFSReadBytes          int64   `json:"nfs_read_bytes"`
+	NFSWriteBytes         int64   `json:"nfs_write_bytes"`
+	CheckpointSizeBytes   int64   `json:"checkpoint_size_bytes"`
+	AllReduceBandwidthMBs float64 `json:"allreduce_bandwidth_MBs"`
+	NFSReadBandwidthMBs   float64 `json:"nfs_read_bandwidth_MBs"`
+	NFSWriteBandwidthMBs  float64 `json:"nfs_write_bandwidth_MBs"`
+}
+
 // CollectResults implements backend.JobBackend.
 //
 // Reads all_results.json written by the HuggingFace Trainer to
-// /mnt/output/checkpoints/all_results.json on the configured output PVC.
+// /mnt/output/checkpoints/all_results.json on the configured output PVC, and
+// (optionally) transfer_profile.json alongside it for the data-transfer metrics.
 // OutputPVCName is required — the log-scraping fallback was removed so the
 // operator can delete the worker node pool in parallel with result collection
 // (the NFS server lives on a different pool, so PVC reads survive the worker
 // teardown).
 //
-// Keys populated: "loss", "perplexity", "samplesPerSecond"
+// Keys populated: "loss", "perplexity", "samplesPerSecond", "totalSamples", and
+// — when transfer_profile.json is present — the "*Fraction", "*Bytes" and
+// "*BandwidthMBs" transfer metrics.
 func (b *Backend) CollectResults(
 	ctx context.Context,
 	c client.Client,
@@ -236,7 +260,48 @@ func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pv
 		}
 		metrics["perplexity"] = fmt.Sprintf("%.4f", ppl)
 	}
+
+	// Optional data-transfer breakdown. Absent file → skip (not every job is
+	// instrumented); the regular results above are still returned.
+	addTransferMetrics(ctx, cs, namespace, pvcName, metrics)
+
 	return metrics, nil
+}
+
+// addTransferMetrics reads transfer_profile.json from the PVC (if present) and
+// folds its fields into the metrics map. A missing or unparseable file is logged
+// and ignored so result collection never fails on its account.
+func addTransferMetrics(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName string, metrics map[string]string) {
+	log := logf.FromContext(ctx)
+	raw, err := collect.FromPVCFile(ctx, cs, namespace, pvcName, "checkpoints/transfer_profile.json")
+	if err != nil {
+		log.Info("No transfer_profile.json found — skipping transfer metrics", "pvc", pvcName, "reason", err.Error())
+		return
+	}
+	var tp transferProfile
+	if err := json.Unmarshal(raw, &tp); err != nil {
+		log.Error(err, "Could not parse transfer_profile.json — skipping transfer metrics", "pvc", pvcName)
+		return
+	}
+	foldTransferMetrics(tp, metrics)
+}
+
+// foldTransferMetrics writes a transferProfile's fields into the metrics map
+// using the operator's camelCase metric keys. Pure function, kept separate for
+// testing the script.py → operator contract.
+func foldTransferMetrics(tp transferProfile, metrics map[string]string) {
+	metrics["allreduceFraction"] = fmt.Sprintf("%.6f", tp.AllReduceFraction)
+	metrics["dataloadFraction"] = fmt.Sprintf("%.6f", tp.DataloadFraction)
+	metrics["computeFraction"] = fmt.Sprintf("%.6f", tp.ComputeFraction)
+	metrics["totalAllreduceSeconds"] = fmt.Sprintf("%.4f", tp.TotalAllReduceS)
+	metrics["gradSizeBytes"] = fmt.Sprintf("%d", tp.GradSizeBytes)
+	metrics["totalAllreduceBytes"] = fmt.Sprintf("%d", tp.TotalAllReduceBytes)
+	metrics["nfsReadBytes"] = fmt.Sprintf("%d", tp.NFSReadBytes)
+	metrics["nfsWriteBytes"] = fmt.Sprintf("%d", tp.NFSWriteBytes)
+	metrics["checkpointSizeBytes"] = fmt.Sprintf("%d", tp.CheckpointSizeBytes)
+	metrics["allreduceBandwidthMBs"] = fmt.Sprintf("%.4f", tp.AllReduceBandwidthMBs)
+	metrics["nfsReadBandwidthMBs"] = fmt.Sprintf("%.4f", tp.NFSReadBandwidthMBs)
+	metrics["nfsWriteBandwidthMBs"] = fmt.Sprintf("%.4f", tp.NFSWriteBandwidthMBs)
 }
 
 // ---------------------------------------------------------------------------
@@ -246,12 +311,12 @@ func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pv
 // buildCommandAndArgs returns the container command and args.
 // If pytorchSpec.Command is set → use first element as command, rest as args.
 // Otherwise build torchrun from the LLM fine-tuning overlay.
-func buildCommandAndArgs(job *trainingv1.DistributedTraining) ([]interface{}, []interface{}) {
+func buildCommandAndArgs(job *trainingv1.DistributedTraining) ([]any, []any) {
 	ps := job.Spec.PytorchSpec
 
 	if len(ps.Command) > 0 {
-		cmd := []interface{}{ps.Command[0]}
-		args := make([]interface{}, len(ps.Command)-1)
+		cmd := []any{ps.Command[0]}
+		args := make([]any, len(ps.Command)-1)
 		for i, a := range ps.Command[1:] {
 			args[i] = a
 		}
@@ -260,10 +325,10 @@ func buildCommandAndArgs(job *trainingv1.DistributedTraining) ([]interface{}, []
 
 	// Build torchrun command for LLM fine-tuning workload.
 	torchrunArgs := buildTorchrunArgs(job)
-	return []interface{}{"torchrun"}, torchrunArgs
+	return []any{"torchrun"}, torchrunArgs
 }
 
-func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
+func buildTorchrunArgs(job *trainingv1.DistributedTraining) []any {
 	spec := job.Spec
 	ps := spec.PytorchSpec
 
@@ -424,15 +489,15 @@ func buildTorchrunArgs(job *trainingv1.DistributedTraining) []interface{} {
 		args = append(args, fmt.Sprintf("--resume_from_checkpoint=%s", spec.ResumeFromCheckpoint))
 	}
 
-	result := make([]interface{}, len(args))
+	result := make([]any, len(args))
 	for i, a := range args {
 		result[i] = a
 	}
 	return result
 }
 
-func buildEnvVars(job *trainingv1.DistributedTraining) []interface{} {
-	vars := []interface{}{}
+func buildEnvVars(job *trainingv1.DistributedTraining) []any {
+	vars := []any{}
 
 	// HF_TOKEN is the only env the operator injects dynamically — it wires a
 	// Kubernetes Secret reference (valueFrom.secretKeyRef) that can't be
@@ -442,10 +507,10 @@ func buildEnvVars(job *trainingv1.DistributedTraining) []interface{} {
 	// image- and workload-agnostic.
 	if job.Spec.Model != nil {
 		if hft := job.Spec.Model.HFTokenSecret; hft != nil {
-			vars = append(vars, map[string]interface{}{
+			vars = append(vars, map[string]any{
 				"name": "HF_TOKEN",
-				"valueFrom": map[string]interface{}{
-					"secretKeyRef": map[string]interface{}{"name": hft.Name, "key": hft.Key},
+				"valueFrom": map[string]any{
+					"secretKeyRef": map[string]any{"name": hft.Name, "key": hft.Key},
 				},
 			})
 		}
@@ -453,50 +518,50 @@ func buildEnvVars(job *trainingv1.DistributedTraining) []interface{} {
 
 	// Append user-defined env vars from pytorchSpec.
 	for _, e := range job.Spec.PytorchSpec.Env {
-		entry := map[string]interface{}{"name": e.Name, "value": e.Value}
+		entry := map[string]any{"name": e.Name, "value": e.Value}
 		vars = append(vars, entry)
 	}
 
 	return vars
 }
 
-func buildVolumes(job *trainingv1.DistributedTraining) ([]interface{}, []interface{}) {
-	volumes := []interface{}{
-		map[string]interface{}{"name": "dshm", "emptyDir": map[string]interface{}{"medium": "Memory"}},
+func buildVolumes(job *trainingv1.DistributedTraining) ([]any, []any) {
+	volumes := []any{
+		map[string]any{"name": "dshm", "emptyDir": map[string]any{"medium": "Memory"}},
 	}
-	mounts := []interface{}{
-		map[string]interface{}{"name": "dshm", "mountPath": "/dev/shm"},
+	mounts := []any{
+		map[string]any{"name": "dshm", "mountPath": "/dev/shm"},
 	}
 	if job.Spec.OutputPVCName != "" {
-		volumes = append(volumes, map[string]interface{}{
+		volumes = append(volumes, map[string]any{
 			"name":                  "output",
-			"persistentVolumeClaim": map[string]interface{}{"claimName": job.Spec.OutputPVCName},
+			"persistentVolumeClaim": map[string]any{"claimName": job.Spec.OutputPVCName},
 		})
-		mounts = append(mounts, map[string]interface{}{"name": "output", "mountPath": "/mnt/output"})
+		mounts = append(mounts, map[string]any{"name": "output", "mountPath": "/mnt/output"})
 	}
 	return volumes, mounts
 }
 
 // buildResources converts pytorchSpec.Resources into an unstructured map.
 // Falls back to GPU resource limit derived from hardware spec if resources are empty.
-func buildResources(job *trainingv1.DistributedTraining) map[string]interface{} {
+func buildResources(job *trainingv1.DistributedTraining) map[string]any {
 	ps := job.Spec.PytorchSpec
 	if ps == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
 	// If pytorchSpec.Resources has limits set, convert them directly.
 	if len(ps.Resources.Limits) > 0 || len(ps.Resources.Requests) > 0 {
-		res := map[string]interface{}{}
+		res := map[string]any{}
 		if len(ps.Resources.Limits) > 0 {
-			limits := map[string]interface{}{}
+			limits := map[string]any{}
 			for k, v := range ps.Resources.Limits {
 				limits[string(k)] = v.String()
 			}
 			res["limits"] = limits
 		}
 		if len(ps.Resources.Requests) > 0 {
-			requests := map[string]interface{}{}
+			requests := map[string]any{}
 			for k, v := range ps.Resources.Requests {
 				requests[string(k)] = v.String()
 			}
@@ -511,15 +576,15 @@ func buildResources(job *trainingv1.DistributedTraining) map[string]interface{} 
 		if gpuCount == 0 {
 			gpuCount = 1
 		}
-		return map[string]interface{}{
-			"limits": map[string]interface{}{"nvidia.com/gpu": fmt.Sprintf("%d", gpuCount)},
+		return map[string]any{
+			"limits": map[string]any{"nvidia.com/gpu": fmt.Sprintf("%d", gpuCount)},
 		}
 	}
 
-	return map[string]interface{}{}
+	return map[string]any{}
 }
 
-func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]interface{}, []interface{}) {
+func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
 	poolName := job.Spec.Hardware.NodePoolName
 	if poolName == "" {
 		if hasGPUFromSpec(job.Spec.PytorchSpec, job.Spec.Hardware) {
@@ -528,12 +593,12 @@ func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]interfac
 			poolName = "cpu-pool"
 		}
 	}
-	nodeSelector := map[string]interface{}{"cloud.google.com/gke-nodepool": poolName}
-	tolerations := []interface{}{
-		map[string]interface{}{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
+	nodeSelector := map[string]any{"cloud.google.com/gke-nodepool": poolName}
+	tolerations := []any{
+		map[string]any{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
 	}
 	if hasGPUFromSpec(job.Spec.PytorchSpec, job.Spec.Hardware) {
-		tolerations = append(tolerations, map[string]interface{}{
+		tolerations = append(tolerations, map[string]any{
 			"key": "nvidia.com/gpu", "operator": "Exists", "effect": "NoSchedule",
 		})
 	}
@@ -565,20 +630,20 @@ func hasGPUFromSpec(ps *trainingv1.PytorchSpec, hw trainingv1.HardwareSpec) bool
 func buildReplicaSpecs(
 	masterReplicas, workerReplicas int64,
 	image string,
-	command, args, envVars, volumes, volumeMounts []interface{},
-	resources map[string]interface{},
-	nodeSelector map[string]interface{},
-	tolerations []interface{},
-) map[string]interface{} {
-	specs := map[string]interface{}{
-		"Master": map[string]interface{}{
+	command, args, envVars, volumes, volumeMounts []any,
+	resources map[string]any,
+	nodeSelector map[string]any,
+	tolerations []any,
+) map[string]any {
+	specs := map[string]any{
+		"Master": map[string]any{
 			"replicas":      masterReplicas,
 			"restartPolicy": "OnFailure",
 			"template":      replicaTemplate(image, command, args, envVars, volumes, volumeMounts, resources, nodeSelector, tolerations),
 		},
 	}
 	if workerReplicas > 0 {
-		specs["Worker"] = map[string]interface{}{
+		specs["Worker"] = map[string]any{
 			"replicas":      workerReplicas,
 			"restartPolicy": "OnFailure",
 			"template":      replicaTemplate(image, command, args, envVars, volumes, volumeMounts, resources, nodeSelector, tolerations),
@@ -589,19 +654,19 @@ func buildReplicaSpecs(
 
 func replicaTemplate(
 	image string,
-	command, args, envVars, volumes, volumeMounts []interface{},
-	resources map[string]interface{},
-	nodeSelector map[string]interface{},
-	tolerations []interface{},
-) map[string]interface{} {
-	return map[string]interface{}{
-		"spec": map[string]interface{}{
+	command, args, envVars, volumes, volumeMounts []any,
+	resources map[string]any,
+	nodeSelector map[string]any,
+	tolerations []any,
+) map[string]any {
+	return map[string]any{
+		"spec": map[string]any{
 			"restartPolicy": "Never",
 			"nodeSelector":  nodeSelector,
 			"tolerations":   tolerations,
 			"volumes":       volumes,
-			"containers": []interface{}{
-				map[string]interface{}{
+			"containers": []any{
+				map[string]any{
 					"name":            "pytorch",
 					"image":           image,
 					"imagePullPolicy": "Always",
@@ -610,7 +675,7 @@ func replicaTemplate(
 					"env":             envVars,
 					"volumeMounts":    volumeMounts,
 					"resources":       resources,
-					"securityContext": map[string]interface{}{"allowPrivilegeEscalation": false},
+					"securityContext": map[string]any{"allowPrivilegeEscalation": false},
 				},
 			},
 		},
@@ -624,7 +689,7 @@ func replicaTemplate(
 func parsePyTorchJobPhase(pj *unstructured.Unstructured) (string, string) {
 	conditions, _, _ := unstructured.NestedSlice(pj.Object, "status", "conditions")
 	for _, c := range conditions {
-		cmap, ok := c.(map[string]interface{})
+		cmap, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
