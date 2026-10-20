@@ -54,6 +54,41 @@ type DistributedTrainingHistorySpec struct {
 	// Stored for observability only — the solver recomputes cost from current pricing.
 	// +optional
 	ActualCostUSD string `json:"actualCostUSD,omitempty"`
+
+	// --- Data-transfer breakdown (optional) ---
+	// Populated from transfer_profile.json when the run is instrumented
+	// (see script.py / thesis Ch 4). Absent for uninstrumented runs. These feed
+	// the "explain α" analysis that correlates measured communication overhead
+	// with the fitted scaling penalty.
+
+	// AllReduceFraction is the fraction of training time spent in gradient
+	// AllReduce (upper bound — communication overlaps backward compute).
+	// +optional
+	AllReduceFraction string `json:"allReduceFraction,omitempty"`
+
+	// DataloadFraction is the fraction of training time spent waiting for data.
+	// +optional
+	DataloadFraction string `json:"dataloadFraction,omitempty"`
+
+	// ComputeFraction is the fraction of training time spent in compute.
+	// +optional
+	ComputeFraction string `json:"computeFraction,omitempty"`
+
+	// AllReduceBandwidthMBs is the measured AllReduce bandwidth in MB/s.
+	// +optional
+	AllReduceBandwidthMBs string `json:"allReduceBandwidthMBs,omitempty"`
+
+	// NFSReadBandwidthMBs is the measured NFS read bandwidth in MB/s.
+	// +optional
+	NFSReadBandwidthMBs string `json:"nfsReadBandwidthMBs,omitempty"`
+
+	// GradSizeBytes is the per-step gradient size in bytes.
+	// +optional
+	GradSizeBytes int64 `json:"gradSizeBytes,omitempty"`
+
+	// TotalAllReduceBytes is the total bytes moved by AllReduce across the run.
+	// +optional
+	TotalAllReduceBytes int64 `json:"totalAllReduceBytes,omitempty"`
 }
 
 // DistributedTrainingHistory is the Schema for per-run throughput history used by the topology solver.

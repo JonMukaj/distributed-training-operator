@@ -850,6 +850,16 @@ spec:
                 description: Results holds the collected job metrics. Populated in
                   the Collecting phase.
                 properties:
+                  bottleneck:
+                    description: |-
+                      Bottleneck is the dominant overhead class for the run, derived from the
+                      instrumented transfer profile: "compute-bound", "communication-bound", or
+                      "data-bound". Empty when the run is not instrumented (no transfer profile).
+                    enum:
+                    - compute-bound
+                    - communication-bound
+                    - data-bound
+                    type: string
                   collectionTime:
                     description: |-
                       CollectionTime is the wall-clock duration spent in the Collecting phase

@@ -50,6 +50,15 @@ spec:
                   ActualCostUSD is the observed run cost in USD at the time of execution.
                   Stored for observability only — the solver recomputes cost from current pricing.
                 type: string
+              allReduceBandwidthMBs:
+                description: AllReduceBandwidthMBs is the measured AllReduce bandwidth
+                  in MB/s.
+                type: string
+              allReduceFraction:
+                description: |-
+                  AllReduceFraction is the fraction of training time spent in gradient
+                  AllReduce (upper bound — communication overlaps backward compute).
+                type: string
               backend:
                 description: Backend is the job backend that produced this entry (pytorch
                   or spark).
@@ -58,13 +67,29 @@ spec:
                 - spark
                 - job
                 type: string
+              computeFraction:
+                description: ComputeFraction is the fraction of training time spent
+                  in compute.
+                type: string
               configHash:
                 description: |-
                   ConfigHash is the backend-aware hash of the job configuration fields
                   that affect throughput. Used to group entries for the same logical workload.
                 type: string
+              dataloadFraction:
+                description: DataloadFraction is the fraction of training time spent
+                  waiting for data.
+                type: string
+              gradSizeBytes:
+                description: GradSizeBytes is the per-step gradient size in bytes.
+                format: int64
+                type: integer
               machineType:
                 description: MachineType is the GCE machine type used for this run.
+                type: string
+              nfsReadBandwidthMBs:
+                description: NFSReadBandwidthMBs is the measured NFS read bandwidth
+                  in MB/s.
                 type: string
               nodes:
                 description: Nodes is the actual node count used in this run (n_k).
@@ -86,6 +111,11 @@ spec:
                   for PyTorch, records/sec for Spark.
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+              totalAllReduceBytes:
+                description: TotalAllReduceBytes is the total bytes moved by AllReduce
+                  across the run.
+                format: int64
+                type: integer
               totalWork:
                 anyOf:
                 - type: integer

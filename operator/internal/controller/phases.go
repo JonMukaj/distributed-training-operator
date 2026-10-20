@@ -524,6 +524,15 @@ func (r *DistributedTrainingReconciler) reconcileCollecting(
 		}
 	}
 
+	// --- Classify the dominant transfer bottleneck (instrumented runs only) ---
+	if class, ok := classifyBottleneck(results.Metrics); ok {
+		results.Bottleneck = class
+		r.Recorder.Event(job, corev1.EventTypeNormal, "Bottleneck",
+			fmt.Sprintf("Run is %s (allreduce=%s dataload=%s compute=%s)",
+				class, results.Metrics["allreduceFraction"],
+				results.Metrics["dataloadFraction"], results.Metrics["computeFraction"]))
+	}
+
 	// --- Write history (all Succeeded runs, pytorch/spark only) ---
 	r.writeHistoryEntry(ctx, job, results)
 
@@ -538,6 +547,48 @@ func (r *DistributedTrainingReconciler) reconcileCollecting(
 
 	return r.setPhase(ctx, job, trainingv1.PhaseSucceeded,
 		fmt.Sprintf("job complete — %d metrics collected", len(results.Metrics)))
+}
+
+// computeBoundThreshold is the compute-fraction above which a run is classified
+// compute-bound regardless of the comm/data split.
+const computeBoundThreshold = 0.6
+
+// classifyBottleneck derives the dominant overhead class from the instrumented
+// transfer fractions. Returns ok=false when the run is not instrumented (the
+// transfer fractions are absent), so uninstrumented runs get no classification.
+//
+//	compute-bound       : compute_fraction >= computeBoundThreshold
+//	communication-bound : otherwise, allreduce_fraction >= dataload_fraction
+//	data-bound          : otherwise
+func classifyBottleneck(metrics map[string]string) (string, bool) {
+	ar, ok1 := parseFloatMetric(metrics, "allreduceFraction")
+	dl, ok2 := parseFloatMetric(metrics, "dataloadFraction")
+	cp, ok3 := parseFloatMetric(metrics, "computeFraction")
+	if !ok1 || !ok2 || !ok3 {
+		return "", false
+	}
+	switch {
+	case cp >= computeBoundThreshold:
+		return "compute-bound", true
+	case ar >= dl:
+		return "communication-bound", true
+	default:
+		return "data-bound", true
+	}
+}
+
+// parseFloatMetric parses metrics[key] as a float64, reporting ok=false when the
+// key is absent or unparseable.
+func parseFloatMetric(metrics map[string]string, key string) (float64, bool) {
+	s, ok := metrics[key]
+	if !ok {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return f, true
 }
 
 // reconcileSucceeded polls the node pool delete operation until it completes,

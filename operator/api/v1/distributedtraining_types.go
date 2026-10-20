@@ -528,6 +528,13 @@ type JobResults struct {
 	// Spark backend keys:   "recordsProcessed", "processingTimeSeconds", "throughputRecordsPerSec"
 	// +optional
 	Metrics map[string]string `json:"metrics,omitempty"`
+
+	// Bottleneck is the dominant overhead class for the run, derived from the
+	// instrumented transfer profile: "compute-bound", "communication-bound", or
+	// "data-bound". Empty when the run is not instrumented (no transfer profile).
+	// +optional
+	// +kubebuilder:validation:Enum=compute-bound;communication-bound;data-bound
+	Bottleneck string `json:"bottleneck,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

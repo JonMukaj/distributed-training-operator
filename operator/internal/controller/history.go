@@ -125,6 +125,19 @@ func (r *DistributedTrainingReconciler) writeHistoryEntry(
 		},
 	}
 
+	// --- Optional data-transfer breakdown (from transfer_profile.json) ---
+	// Carried through results.Metrics by the collector; absent for
+	// uninstrumented runs, in which case the fields stay empty/zero.
+	if m := results.Metrics; m != nil {
+		hist.Spec.AllReduceFraction = m["allreduceFraction"]
+		hist.Spec.DataloadFraction = m["dataloadFraction"]
+		hist.Spec.ComputeFraction = m["computeFraction"]
+		hist.Spec.AllReduceBandwidthMBs = m["allreduceBandwidthMBs"]
+		hist.Spec.NFSReadBandwidthMBs = m["nfsReadBandwidthMBs"]
+		hist.Spec.GradSizeBytes = parseInt64(m["gradSizeBytes"])
+		hist.Spec.TotalAllReduceBytes = parseInt64(m["totalAllreduceBytes"])
+	}
+
 	if err := r.Create(ctx, hist); err != nil {
 		logger.Error(err, "failed to create DistributedTrainingHistory CR")
 	} else {
@@ -134,6 +147,15 @@ func (r *DistributedTrainingReconciler) writeHistoryEntry(
 
 func quantityFromFloat(f float64) resource.Quantity {
 	return resource.MustParse(strconv.FormatFloat(f, 'f', -1, 64))
+}
+
+// parseInt64 parses a decimal string to int64, returning 0 on empty/invalid input.
+func parseInt64(s string) int64 {
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // pruneHistory deletes the oldest entries if the count for configHash is at or above the limit.
