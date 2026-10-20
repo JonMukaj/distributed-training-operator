@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -521,6 +522,19 @@ func (r *DistributedTrainingReconciler) reconcileCollecting(
 	for k, v := range results.Metrics {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			trainingMetricGauge.WithLabelValues(ns, name, k).Set(f)
+		}
+	}
+
+	// Dedicated data-transfer gauges (instrumented runs only; absent keys skipped).
+	for key, g := range map[string]*prometheus.GaugeVec{
+		"allreduceFraction":     allreduceFractionGauge,
+		"dataloadFraction":      dataloadFractionGauge,
+		"computeFraction":       computeFractionGauge,
+		"allreduceBandwidthMBs": allreduceBandwidthGauge,
+		"nfsReadBandwidthMBs":   nfsReadBandwidthGauge,
+	} {
+		if f, ok := parseFloatMetric(results.Metrics, key); ok {
+			g.WithLabelValues(ns, name).Set(f)
 		}
 	}
 

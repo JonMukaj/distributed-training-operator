@@ -109,6 +109,48 @@ var (
 		},
 		[]string{"namespace", "dj_name"},
 	)
+
+	// --- Data-transfer gauges (set only for instrumented runs) ---
+
+	allreduceFractionGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distributedtraining_allreduce_fraction",
+			Help: "Fraction of training time spent in gradient AllReduce (upper bound).",
+		},
+		[]string{"namespace", "dj_name"},
+	)
+
+	dataloadFractionGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distributedtraining_dataload_fraction",
+			Help: "Fraction of training time spent waiting for data loading.",
+		},
+		[]string{"namespace", "dj_name"},
+	)
+
+	computeFractionGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distributedtraining_compute_fraction",
+			Help: "Fraction of training time spent in compute.",
+		},
+		[]string{"namespace", "dj_name"},
+	)
+
+	allreduceBandwidthGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distributedtraining_allreduce_bandwidth_mbs",
+			Help: "Measured AllReduce bandwidth in MB/s.",
+		},
+		[]string{"namespace", "dj_name"},
+	)
+
+	nfsReadBandwidthGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "distributedtraining_nfs_read_bandwidth_mbs",
+			Help: "Measured NFS read bandwidth in MB/s.",
+		},
+		[]string{"namespace", "dj_name"},
+	)
 )
 
 func init() {
@@ -126,5 +168,10 @@ func init() {
 		trainingMetricGauge,
 		objectiveTargetTimeSecondsGauge,
 		objectiveMaxCostUSDGauge,
+		allreduceFractionGauge,
+		dataloadFractionGauge,
+		computeFractionGauge,
+		allreduceBandwidthGauge,
+		nfsReadBandwidthGauge,
 	)
 }
