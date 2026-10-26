@@ -20,12 +20,6 @@ variable "kubernetes_version" {
   default     = "1.36.1"
 }
 
-variable "image_name" {
-  description = "OS image for the cluster nodes."
-  type        = string
-  default     = "Ubuntu Server 22.04 LTS R535 CUDA 12.2"
-}
-
 variable "master_flavor_name" {
   description = "Flavor for the master node(s). Masters must use a CPU-only flavor."
   type        = string
@@ -38,8 +32,15 @@ variable "node_flavor_name" {
   default     = "n1-cpu-medium"
 }
 
+variable "master_count" {
+  description = "Number of master nodes.(2-3)"
+  type        = number
+  default     = 2
+}
+
+
 variable "node_count" {
   description = "Number of worker nodes in the initial (default) node group. The operator adds ephemeral node groups on top of this."
   type        = number
-  default     = 1
+  default     = 2
 }

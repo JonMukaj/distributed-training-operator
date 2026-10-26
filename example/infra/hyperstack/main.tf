@@ -15,8 +15,8 @@ resource "hyperstack_core_cluster" "this" {
   environment_name   = var.environment_name
   keypair_name       = var.keypair_name
   kubernetes_version = var.kubernetes_version
-  image_name         = var.image_name
   master_flavor_name = var.master_flavor_name
   node_flavor_name   = var.node_flavor_name
+  master_count       = var.master_count
   node_count         = var.node_count
 }

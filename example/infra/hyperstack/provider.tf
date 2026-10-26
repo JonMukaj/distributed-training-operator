@@ -3,7 +3,7 @@ terraform {
   required_providers {
     hyperstack = {
       source  = "NexGenCloud/hyperstack"
-      version = "0.2.2-alpha"
+      version = "1.56.0-alpha"
     }
   }
 }

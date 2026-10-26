@@ -13,3 +13,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Cluster credentials fetched at runtime — never commit these.
+kubeconfig.yaml
+*kubeconfig*

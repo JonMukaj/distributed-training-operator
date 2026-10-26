@@ -15,6 +15,7 @@ completes.
 - [Getting Started](#getting-started)
 - [Project Distribution](#project-distribution)
 - [Development and Deployment on GKE](#development-and-deployment-on-gke)
+- [Development and Deployment on Hyperstack](#development-and-deployment-on-hyperstack)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -539,6 +540,185 @@ If you need to point the controller at a different GCP project, update the overl
 sed -i 's/--gcp-project=.*/--gcp-project=<new-project-id>/' config/overlays/gke/manager_args_patch.yaml
 make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
 ```
+
+---
+
+## Development and Deployment on Hyperstack
+
+This section covers the operator development workflow on a
+[Hyperstack](https://www.hyperstack.cloud/) (NexGen Cloud) managed Kubernetes cluster.
+The operator manages Hyperstack **node groups** (instead of GKE node pools) via its
+`hyperstack` cloud provider.
+
+### Prerequisites
+
+- **Tooling:** `go` v1.25.3+, `docker` 17.03+, `kubectl` v1.11.3+, `helm` 3+,
+  `terraform` v1.0+, and `curl` + `jq` (to fetch the cluster kubeconfig).
+- **Hyperstack account** with an [API key](https://console.hyperstack.cloud/api-keys).
+  The same key is used by the operator, the CSI driver, and Terraform — export it once:
+
+  ```sh
+  export HYPERSTACK_API_KEY=<your-api-key>
+  ```
+- **A Hyperstack environment and an SSH keypair** (created beforehand in the console or
+  API) — the cluster is provisioned into them.
+- **CSI note:** to use dynamic block storage (for the NFS server disk) the cluster must
+  have been created on or after **2025-09-04** (or scaled by one node since), and the API
+  key needs the `volume:*` and `virtual-machine:volume-attach/detach` permissions.
+
+---
+
+### Step 1 — Provision the cluster (Terraform)
+
+```sh
+cd example/infra/hyperstack
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars: environment_name, keypair_name, cluster_name
+terraform init
+terraform apply
+```
+
+Record the cluster ID for the operator overlay:
+
+```sh
+terraform output cluster_id
+```
+
+---
+
+### Step 2 — Connect kubectl to the cluster
+
+The cluster's `kube_config` field (on the cluster-detail response) holds a
+base64-encoded kubeconfig. Retrieve it, decode it, and point `kubectl` at it — replace
+`<cluster_id>` with the ID from Step 1:
+
+```sh
+B64_KUBECONFIG=$(curl -s https://infrahub-api.nexgencloud.com/v1/core/clusters/<cluster_id> \
+  -H "api_key: $HYPERSTACK_API_KEY" | jq -r '.cluster.kube_config')
+
+echo "$B64_KUBECONFIG" | base64 -d > kubeconfig.yaml
+export KUBECONFIG=$PWD/kubeconfig.yaml
+kubectl get nodes
+```
+
+---
+
+### Step 3 — Install cluster dependencies
+
+**CSI driver** (dynamic block storage for the NFS server):
+
+```sh
+helm repo add nexgencloud https://nexgencloud.github.io/csi-hyperstack
+helm repo update
+helm install csi-hyperstack nexgencloud/csi-hyperstack \
+  --namespace kube-system --set hyperstack.apiKey=$HYPERSTACK_API_KEY
+```
+
+**NFS server** (re-exports an RWO volume as the `ReadWriteMany` output PVC the jobs use):
+
+```sh
+kubectl apply -f example/infra/demo/nfs-hyperstack.yaml
+```
+
+**Kubeflow Training Operator** (required for `PyTorchJob` support):
+
+```sh
+kubectl apply -k "github.com/kubeflow/training-operator/manifests/overlays/standalone?ref=v1.7.0"
+kubectl wait --for=condition=Available deployment/training-operator -n kubeflow --timeout=120s
+```
+
+---
+
+### Step 4 — Configure the Hyperstack overlay
+
+Create the namespace and the API-key secret the operator reads:
+
+```sh
+kubectl create namespace operator-system
+kubectl create secret generic hyperstack-api \
+  --from-literal=api-key=$HYPERSTACK_API_KEY \
+  -n operator-system
+```
+
+Set your cluster ID (from Step 1) in
+`config/overlays/hyperstack/manager_args_patch.yaml` (the `--hyperstack-cluster-id` flag).
+
+> **Node label:** the operator counts Ready nodes using the
+> `--hyperstack-nodepool-label` flag (default `hyperstack.cloud/node-group`). Verify it
+> against your cluster with `kubectl get nodes --show-labels` and override it in the
+> overlay if the node-group label differs.
+
+---
+
+### Step 5 — Build and deploy the operator
+
+Install the CRDs, build/push the image, and apply the Hyperstack overlay:
+
+```sh
+# Regenerate manifests/deepcopy after any API change
+make manifests generate
+
+# Install CRDs
+make install
+
+# Build and push the controller image
+make docker-build docker-push IMG=jmukaj/distributed-training-operator:<tag>
+
+# Deploy with the Hyperstack overlay
+kubectl apply -k config/overlays/hyperstack
+kubectl rollout status -n operator-system deploy/operator-controller-manager
+```
+
+> **Local dev loop:** to iterate without building an image, run the controller locally
+> against the cluster (uses your current kubeconfig). `make run` takes no flags, so pass
+> them to `go run` directly:
+>
+> ```sh
+> # HYPERSTACK_API_KEY must be exported in your shell
+> go run ./cmd/main.go --cloud-provider=hyperstack --hyperstack-cluster-id=<id>
+> ```
+
+After editing `*.go` files run `make lint` and `make test` before committing.
+
+---
+
+### Step 6 — Watch the operator
+
+```sh
+# Watch phase transitions
+kubectl get dj -w
+
+# Tail controller logs
+kubectl logs -f -n operator-system deploy/operator-controller-manager
+```
+
+Expected phase sequence: `Pending → Provisioning → Ready → Running → Collecting → Succeeded`
+
+---
+
+### Teardown
+
+Delete the storage workload **before** destroying the cluster. If the node VMs are
+deleted while the CSI volume is still attached, the volume gets stuck in Hyperstack's
+`RESERVED` state — still billed, and recoverable only via the console or support.
+
+```sh
+# 1. Remove workloads so the CSI driver detaches the volume (→ AVAILABLE) while the
+#    nodes still exist.
+kubectl delete -f example/infra/demo/nfs-hyperstack.yaml         # NFS server + PVC
+kubectl delete -k config/overlays/hyperstack       # controller
+make uninstall                                      # CRDs
+
+# 2. Destroy the cluster.
+cd example/infra/hyperstack && terraform destroy
+```
+
+> **Retain note:** the `nfs-retain` StorageClass uses `reclaimPolicy: Retain`, so
+> deleting the PVC **detaches** the Hyperstack volume but does **not** delete it — the
+> volume (with your dataset) stays on the
+> [Volumes page](https://console.hyperstack.cloud/volumes) and keeps billing. Delete it
+> there when you no longer need the data, or set the StorageClass to
+> `reclaimPolicy: Delete` to have the CSI driver remove it automatically with the PVC.
 
 ---
 

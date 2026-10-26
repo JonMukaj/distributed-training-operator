@@ -2,16 +2,16 @@
 # Manual edits may be lost in future updates.
 
 provider "registry.terraform.io/nexgencloud/hyperstack" {
-  version     = "0.2.2-alpha"
-  constraints = "0.2.2-alpha"
+  version     = "1.56.0-alpha"
+  constraints = "1.56.0-alpha"
   hashes = [
-    "h1:tU/VtbAXYjkh8ExE13CncELjGTfyqUMHxkAf7tVP5Tw=",
-    "zh:031781cf9168228e7ee824b3c4be616037147b92eda407d1431f5b3f891f14a5",
-    "zh:27b4ec3bc26de2da20c0ef006d13087d5d5bf10ca8f08f0bc3767ade80db4d35",
-    "zh:3aa42c54c5cf4c80550818794ca67c6708dea5103ee551a4745e1a4d7e75b64f",
-    "zh:3b0e5e4647bcc05fdf1c7ed9c6bf37fd83da7077afa22472d69e6f4b5c98a608",
-    "zh:8520b701ff92830b9af586187dc6663d9ef1675c82559538b9b9e225ddda7e94",
+    "h1:EbGMJdY33wUPv5Dsrla9GTfZzDFvJ/IeK/nUBK/IH7A=",
+    "zh:0a7e41bd0958cffdbdf6e2653fbd07a0e29f57e8d739f09d6e80f67646857065",
+    "zh:3b2939c351ff3a0b964fe6f9226ea98a4e5fc38de31151666c3ac8c3df81be5c",
+    "zh:3b80cd6e92e104a735073c95711fc95acc06c9a6340a6b51f8a60521d6e15161",
+    "zh:3e8b9155b788b289b9285f525b703b26367564f29bcf80942d751b9d3d884440",
     "zh:a33d53acc640dc93b81352ba633cf392bc8c7614a72d320d59d3dcdb22d73fc4",
-    "zh:be1e52e81b7ad6200701f2146bc5272205a37202fe352ab9f4097077978a6eb5",
+    "zh:c15f74b981406a2b535847b6fc33939f9007371242643c39d6e263be57f80df9",
+    "zh:fefc7f05aaa13b7fbe064423bdaa92f9d9e9b9d91865be66fca6fc31b163b0ed",
   ]
 }

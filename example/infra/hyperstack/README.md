@@ -8,7 +8,7 @@ cloud provider.
 Uses the official (alpha) [`NexGenCloud/hyperstack`](https://registry.terraform.io/providers/NexGenCloud/hyperstack)
 Terraform provider and its `hyperstack_core_cluster` resource.
 
-> **Note:** the Hyperstack Terraform provider is in **alpha** (`0.2.2-alpha`).
+> **Note:** the Hyperstack Terraform provider is in **alpha** (`1.56.0-alpha`).
 > Some resources may not be fully stable; check `terraform plan` output carefully.
 
 ## Prerequisites (not managed by this module)
