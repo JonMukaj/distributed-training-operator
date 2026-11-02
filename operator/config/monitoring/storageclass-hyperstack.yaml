@@ -1,0 +1,16 @@
+# Retain so the Prometheus data volume (the measurement record of the whole
+# campaign) survives PVC deletion and a cluster rebuild: bind a static PV to the
+# existing Hyperstack volume. Unlike the NFS disk (example/infra/demo/
+# nfs-hyperstack.yaml, reclaimPolicy Delete), this one is kept on purpose;
+# `make monitoring-uninstall` detaches it and the Volumes page is where it is
+# finally removed. Requires the Hyperstack CSI driver (README Hyperstack Step 3).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-retain
+provisioner: hyperstack.csi.nexgencloud.com
+parameters:
+  type: Cloud-SSD
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

@@ -1,0 +1,7 @@
+# Plain-HTTP metrics Service for the manager (port 8080). The scaffold's
+# config/default/metrics_service.yaml only exposes the 8443 HTTPS port; the
+# cloud overlays run the manager with --metrics-bind-address=:8080
+# --metrics-secure=false, which is what config/monitoring/servicemonitor.yaml
+# scrapes. Included from config/default so namePrefix/namespace apply.
+resources:
+- metrics_http_service.yaml

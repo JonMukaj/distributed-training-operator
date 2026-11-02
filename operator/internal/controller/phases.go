@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,6 +22,13 @@ import (
 )
 
 const requeueAfter = 20 * time.Second
+
+// provisioningTimeout bounds the Provisioning phase. Node-pool creation plus
+// node Ready plus (for GPU jobs) the GPU device plugin coming up takes 5–8 min
+// on Hyperstack and GKE; far beyond that something is wrong (quota, a device
+// plugin that never schedules) and the job must fail instead of spinning while
+// the nodes bill.
+const provisioningTimeout = 30 * time.Minute
 
 // ---------------------------------------------------------------------------
 // Phase: Pending
@@ -194,13 +202,24 @@ func (r *DistributedTrainingReconciler) reconcileProvisioning(
 	// nodes are Ready so that intermediate requeueues poll IsOperationDone (which
 	// returns true immediately) rather than attempting a second CreateNodePool.
 	desired := cfg.NodeCount
-	ready, err := r.countReadyNodesInPool(ctx, poolName)
+	// GPU jobs are ready only when the GPU is allocatable, not when the
+	// kubelet reports Ready: the NVIDIA device plugin advertises nvidia.com/gpu
+	// ~2 min after a fresh node joins, and without this gate that wait landed
+	// in training_seconds (pod Pending on "Insufficient nvidia.com/gpu").
+	requireGPU := inferHardwareType(job.Spec.PytorchSpec, job.Spec.Hardware) == trainingv1.HardwareGPU
+	ready, err := r.countReadyNodesInPool(ctx, poolName, requireGPU)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("counting ready nodes: %w", err)
 	}
 
 	if ready < int(desired) {
-		logger.Info("waiting for nodes to become Ready", "ready", ready, "desired", desired)
+		if job.Status.ProvisioningStartTime != nil && time.Since(job.Status.ProvisioningStartTime.Time) > provisioningTimeout {
+			return r.setFailed(ctx, job,
+				fmt.Sprintf("node pool %s: only %d/%d nodes became ready%s within %s",
+					poolName, ready, desired, map[bool]string{true: " with an allocatable GPU", false: ""}[requireGPU], provisioningTimeout),
+				nil)
+		}
+		logger.Info("waiting for nodes to become Ready", "ready", ready, "desired", desired, "requireGPU", requireGPU)
 		patch := client.MergeFrom(job.DeepCopy())
 		job.Status.NodePoolSize = int32(ready)
 		_ = r.Status().Patch(ctx, job, patch)
@@ -226,11 +245,79 @@ func (r *DistributedTrainingReconciler) reconcileProvisioning(
 		fmt.Sprintf("node pool %s has %d ready nodes", poolName, ready))
 }
 
+// deleteNodesInPool removes the Kubernetes Node objects of a node pool whose
+// cloud resources are confirmed gone.
+//
+// GKE's cloud controller manager does this by itself when a VM disappears.
+// Hyperstack does not: its node group vanishes from the API while the Node
+// objects stay behind as NotReady + SchedulingDisabled (the platform cordons
+// them). That is more than clutter — the next node group that reuses the pool
+// name produces a VM with the same node name, its kubelet re-registers onto the
+// cordoned object, and the training pods never schedule.
+//
+// Only nodes that are not Ready are deleted, so a live node that merely shares
+// the label (e.g. a user-managed pool named like an ephemeral one) is never
+// removed. Errors are logged, not returned: cleanup must never block teardown.
+func (r *DistributedTrainingReconciler) deleteNodesInPool(ctx context.Context, poolName string) {
+	logger := log.FromContext(ctx)
+	nodeList := &corev1.NodeList{}
+	if err := r.List(ctx, nodeList, client.MatchingLabels{r.Cloud.NodePoolLabelKey(): poolName}); err != nil {
+		logger.Error(err, "listing nodes for stale-node cleanup", "pool", poolName)
+		return
+	}
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		if nodeIsReady(node) {
+			logger.Info("stale-node cleanup: node still Ready, leaving it", "node", node.Name, "pool", poolName)
+			continue
+		}
+		if err := r.Delete(ctx, node); err != nil && !apierrors.IsNotFound(err) {
+			logger.Error(err, "deleting stale node object", "node", node.Name, "pool", poolName)
+			continue
+		}
+		logger.Info("deleted stale node object left behind by the cloud", "node", node.Name, "pool", poolName)
+	}
+}
+
+func nodeIsReady(node *corev1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == corev1.NodeReady {
+			return c.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// nodeReadyForJob reports whether an (unstructured) Node can run the job:
+// kubelet Ready, and — for GPU jobs — at least one allocatable nvidia.com/gpu.
+// Pure function, unit-tested in phases_test.go.
+func nodeReadyForJob(node map[string]any, requireGPU bool) bool {
+	ready := false
+	conditions, _, _ := unstructured.NestedSlice(node, "status", "conditions")
+	for _, c := range conditions {
+		cmap, ok := c.(map[string]any)
+		if ok && cmap["type"] == "Ready" && cmap["status"] == "True" {
+			ready = true
+			break
+		}
+	}
+	if !ready || !requireGPU {
+		return ready
+	}
+	gpuStr, found, _ := unstructured.NestedString(node, "status", "allocatable", "nvidia.com/gpu")
+	if !found {
+		return false
+	}
+	q, err := resource.ParseQuantity(gpuStr)
+	return err == nil && q.Value() >= 1
+}
+
 // countReadyNodesInPool lists nodes by the provider's label key and counts
 // those in Ready condition.
 func (r *DistributedTrainingReconciler) countReadyNodesInPool(
 	ctx context.Context,
 	poolName string,
+	requireGPU bool,
 ) (int, error) {
 	nodeList := &unstructured.UnstructuredList{}
 	nodeList.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "NodeList"})
@@ -243,15 +330,8 @@ func (r *DistributedTrainingReconciler) countReadyNodesInPool(
 
 	ready := 0
 	for _, node := range nodeList.Items {
-		conditions, _, _ := unstructured.NestedSlice(node.Object, "status", "conditions")
-		for _, c := range conditions {
-			cmap, ok := c.(map[string]any)
-			if !ok {
-				continue
-			}
-			if cmap["type"] == "Ready" && cmap["status"] == "True" {
-				ready++
-			}
+		if nodeReadyForJob(node.Object, requireGPU) {
+			ready++
 		}
 	}
 	return ready, nil
@@ -375,9 +455,10 @@ func (r *DistributedTrainingReconciler) reconcileRunning(
 	}
 
 	// Set TrainingStartTime from the backend's own start time the first time
-	// we can read it. This excludes image pull and pod scheduling from
-	// `training_seconds`, matching baseline_train.sh's measurement window
-	// (Kubeflow PyTorchJob.status.startTime → status.completionTime).
+	// we can read it. For PyTorch that is the moment the PyTorchJob's Running
+	// condition became true (all replica pods running), so pod scheduling and
+	// image pull are excluded from `training_seconds`. (status.startTime would
+	// NOT do: Kubeflow sets it when the job object is created.)
 	if job.Status.TrainingStartTime == nil {
 		pjStart, startErr := b.GetStartTime(ctx, r.Client, job.Namespace, job.Status.JobName)
 		if startErr != nil {
@@ -627,6 +708,9 @@ func (r *DistributedTrainingReconciler) reconcileSucceeded(
 	}
 
 	logger.Info("node pool deletion confirmed", "pool", r.nodePoolName(job))
+
+	// The cloud no longer has the pool; drop the Node objects it may have left.
+	r.deleteNodesInPool(ctx, r.nodePoolName(job))
 
 	patch := client.MergeFrom(job.DeepCopy())
 	job.Status.GKEOperationID = ""

@@ -1,0 +1,51 @@
+# kube-prometheus-stack values for the Hyperstack cluster.
+#   make monitoring-install CLOUD=hyperstack
+#
+# Hyperstack specifics:
+#   * The operator's ephemeral GPU node groups carry no taint, so every
+#     stateful or long-running component is pinned to the base worker group
+#     (hyperstack.cloud/node-group-name=default). Otherwise Prometheus could land
+#     on a GPU node and be killed — volume attached — when that group is deleted.
+#   * The TSDB volume comes from the Hyperstack CSI driver via the
+#     prometheus-retain StorageClass (storageclass-hyperstack.yaml). Retain means
+#     the volume survives PVC deletion; delete the PVC BEFORE destroying the
+#     cluster or the volume gets stuck RESERVED (make monitoring-uninstall does).
+#   * Thesis runs are sparse: keep 90 days.
+alertmanager:
+  enabled: false
+
+prometheusOperator:
+  nodeSelector: &base
+    hyperstack.cloud/node-group-name: default
+
+kube-state-metrics:
+  nodeSelector: *base
+
+grafana:
+  adminPassword: admin            # override: --set grafana.adminPassword=...
+  nodeSelector: *base
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard    # config/grafana/ publishes the operator dashboard with this label
+  imageRenderer:
+    enabled: true
+    nodeSelector: *base
+
+prometheus:
+  prometheusSpec:
+    nodeSelector: *base
+    # Pick up every ServiceMonitor/PodMonitor in the cluster, not only the
+    # chart's own — the operator's ServiceMonitor lives in config/monitoring.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    enableAdminAPI: true
+    retention: 90d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: prometheus-retain
+          resources:
+            requests:
+              storage: 10Gi

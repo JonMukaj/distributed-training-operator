@@ -22,11 +22,21 @@ import (
 var _ backend.JobBackend = (*Backend)(nil)
 
 // Backend implements JobBackend for the Spark Operator (SparkApplication CRD).
-type Backend struct{}
+type Backend struct {
+	// nodePoolLabelKey is the node label carrying the node-pool / node-group
+	// name on the current cloud (from cloud.Provider.NodePoolLabelKey()).
+	nodePoolLabelKey string
+}
 
-// New creates a Spark backend.
-func New() *Backend {
-	return &Backend{}
+// DefaultNodePoolLabelKey is used when New is given an empty key (GKE).
+const DefaultNodePoolLabelKey = "cloud.google.com/gke-nodepool"
+
+// New creates a Spark backend. An empty nodePoolLabelKey falls back to the GKE label.
+func New(nodePoolLabelKey string) *Backend {
+	if nodePoolLabelKey == "" {
+		nodePoolLabelKey = DefaultNodePoolLabelKey
+	}
+	return &Backend{nodePoolLabelKey: nodePoolLabelKey}
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +61,7 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 
 	driverCores, executorCores, executorInstances := resolveTopology(job, sparkSpec)
 	driverMemory, executorMemory := resolveMemory(sparkSpec)
-	nodeSel, tolerations := buildNodeSelector(job)
+	nodeSel, tolerations := b.buildNodeSelector(job)
 
 	appSpec := map[string]any{
 		"type":                sparkSpec.Type,
@@ -256,7 +266,7 @@ func buildVolumes(job *trainingv1.DistributedTraining) []any {
 	return volumes
 }
 
-func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
+func (b *Backend) buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
 	poolName := job.Spec.Hardware.NodePoolName
 	if poolName == "" {
 		if job.Spec.Hardware.Type == trainingv1.HardwareGPU {
@@ -265,7 +275,7 @@ func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []a
 			poolName = "cpu-pool"
 		}
 	}
-	nodeSelector := map[string]any{"cloud.google.com/gke-nodepool": poolName}
+	nodeSelector := map[string]any{b.nodePoolLabelKey: poolName}
 	tolerations := []any{
 		map[string]any{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
 	}

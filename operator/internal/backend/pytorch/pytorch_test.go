@@ -3,6 +3,9 @@ package pytorch
 import (
 	"encoding/json"
 	"testing"
+	"time"
+
+	trainingv1 "github.com/JonMukaj/distributed-training-operator/api/v1"
 )
 
 // sampleTransferProfile mirrors the JSON written by script.py's
@@ -76,5 +79,58 @@ func TestFoldTransferMetrics(t *testing.T) {
 		if metrics[k] != v {
 			t.Errorf("metrics[%q] = %q, want %q", k, metrics[k], v)
 		}
+	}
+}
+
+// TestBuildNodeSelectorUsesProviderLabel locks the multi-cloud contract: the
+// replica nodeSelector must use the cloud provider's node-pool label, not a
+// hard-coded GKE key, or pods never schedule on Hyperstack node groups.
+func TestBuildNodeSelectorUsesProviderLabel(t *testing.T) {
+	job := &trainingv1.DistributedTraining{}
+	job.Spec.Hardware.Type = trainingv1.HardwareGPU
+	job.Spec.Hardware.NodePoolName = "dj-gpu-cal-1"
+
+	cases := []struct{ key, wantKey string }{
+		{"", DefaultNodePoolLabelKey},
+		{"hyperstack.cloud/node-group-name", "hyperstack.cloud/node-group-name"},
+	}
+	for _, c := range cases {
+		sel, tol := New(c.key).buildNodeSelector(job)
+		if got := sel[c.wantKey]; got != "dj-gpu-cal-1" {
+			t.Errorf("New(%q): nodeSelector = %v, want %q=dj-gpu-cal-1", c.key, sel, c.wantKey)
+		}
+		if len(sel) != 1 {
+			t.Errorf("New(%q): nodeSelector has %d keys, want 1", c.key, len(sel))
+		}
+		if len(tol) != 2 { // reserved-pool + nvidia.com/gpu
+			t.Errorf("New(%q): %d tolerations, want 2 for GPU", c.key, len(tol))
+		}
+	}
+}
+
+// TestRunningSince locks the training-start definition: the Running condition's
+// transition time, never status.startTime (job creation).
+func TestRunningSince(t *testing.T) {
+	cond := func(typ, status, ts string) map[string]any {
+		return map[string]any{"type": typ, "status": status, "lastTransitionTime": ts}
+	}
+	got, err := runningSince([]any{
+		cond("Created", "True", "2026-11-02T22:29:03Z"),
+		cond("Running", "True", "2026-11-02T22:33:10Z"),
+	})
+	if err != nil || !got.Equal(time.Date(2026, 11, 2, 22, 33, 10, 0, time.UTC)) {
+		t.Fatalf("got %v, %v; want 22:33:10Z", got, err)
+	}
+	// Not running yet → zero time, no error (controller retries).
+	got, err = runningSince([]any{cond("Created", "True", "2026-11-02T22:29:03Z")})
+	if err != nil || !got.IsZero() {
+		t.Fatalf("expected zero time while not Running, got %v, %v", got, err)
+	}
+	got, err = runningSince([]any{cond("Running", "False", "2026-11-02T22:33:10Z")})
+	if err != nil || !got.IsZero() {
+		t.Fatalf("Running=False must not count, got %v, %v", got, err)
+	}
+	if _, err = runningSince([]any{cond("Running", "True", "yesterday")}); err == nil {
+		t.Fatalf("expected parse error for a bad timestamp")
 	}
 }

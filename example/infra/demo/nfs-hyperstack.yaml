@@ -11,22 +11,30 @@
 #
 # The NFS server then re-exports the RWO volume as RWX, exactly as on GKE.
 ---
-# Retain so the dataset disk survives PVC/cluster teardown (mirrors the
-# standalone google_compute_disk on GCP; the default csi-hyperstack class is Delete).
+# reclaimPolicy Delete: deleting the nfs-disk PVC deletes the Hyperstack volume
+# too, so nothing keeps billing after teardown. The data on it (HF cache,
+# checkpoints, archived results) is therefore gone with the PVC — run
+# `make archive-results` for every run first (see README Step 7). Use Retain
+# instead if the disk must outlive the cluster.
 #
-# Teardown order matters: delete this workload (so CSI detaches the volume →
-# AVAILABLE) BEFORE destroying the cluster. If the node VMs are deleted while the
-# volume is still attached, it gets stuck in Hyperstack's RESERVED state (still
-# billed). With Retain, deleting the PVC detaches but does not delete the volume —
-# remove it from the Hyperstack Volumes page when the dataset is no longer needed.
+# Teardown order still matters: delete this workload (so CSI detaches and
+# deletes the volume) BEFORE destroying the cluster. If the node VMs are deleted
+# while the volume is still attached, it gets stuck in Hyperstack's RESERVED
+# state (still billed) and must be removed from the Volumes page by hand.
+#
+# StorageClasses are immutable: to switch an existing cluster from the former
+# `nfs-retain` class, delete that StorageClass, apply this one, and patch the
+# already-provisioned PV (its policy was fixed at provisioning time):
+#   kubectl patch pv $(kubectl get pvc nfs-disk -o jsonpath='{.spec.volumeName}') \
+#     -p '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: nfs-retain
+  name: nfs-hyperstack
 provisioner: hyperstack.csi.nexgencloud.com
 parameters:
   type: Cloud-SSD
-reclaimPolicy: Retain
+reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
 ---
@@ -37,7 +45,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: nfs-retain
+  storageClassName: nfs-hyperstack
   resources:
     requests:
       storage: 50Gi

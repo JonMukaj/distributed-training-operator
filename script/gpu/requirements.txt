@@ -1,0 +1,16 @@
+# Python dependencies for finetune.py (instrumented HF-Trainer fine-tuning),
+# script.py (standalone instrumented DDP loop) and pretokenize.py.
+#
+# torch 2.4.1 is the CUDA 12.1 build used for local testing:
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu121
+# transformers 5.x requires torch >= 2.6 and datasets 5.x needs a newer
+# huggingface-hub than transformers 4.x allows, hence the <5 pins.
+torch==2.4.1
+transformers>=4.57,<5
+datasets>=4.8,<5
+peft>=0.17
+accelerate>=1.0   # required by the HF Trainer; make the dependency explicit
+# Llama-family tokenizers (smol_llama in the baseline workload)
+sentencepiece
+tiktoken
+protobuf

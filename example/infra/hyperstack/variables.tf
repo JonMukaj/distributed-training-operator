@@ -42,5 +42,5 @@ variable "master_count" {
 variable "node_count" {
   description = "Number of worker nodes in the initial (default) node group. The operator adds ephemeral node groups on top of this."
   type        = number
-  default     = 2
+  default     = 1
 }

@@ -1,5 +1,11 @@
 # Build the manager binary
-FROM --platform=$BUILDPLATFORM golang:1.25.3-alpine AS builder
+#
+# No --platform here on purpose: `make docker-build` must work with the plain
+# (legacy) docker builder, which cannot expand $BUILDPLATFORM in FROM. The
+# multi-arch `make docker-buildx` target inserts --platform=${BUILDPLATFORM}
+# into a temporary Dockerfile.cross itself. TARGETOS/TARGETARCH are set by
+# BuildKit for cross builds and empty otherwise (-> host platform).
+FROM golang:1.25.3-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 

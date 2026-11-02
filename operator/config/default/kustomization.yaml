@@ -18,6 +18,9 @@ resources:
 - ../crd
 - ../rbac
 - ../manager
+# Plain-HTTP metrics Service (port 8080) for Prometheus; the cloud overlays run
+# the manager with --metrics-bind-address=:8080 --metrics-secure=false.
+- ../prometheus-http
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
 #- ../webhook

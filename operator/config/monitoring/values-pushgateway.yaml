@@ -1,0 +1,8 @@
+# prometheus-pushgateway values. Lets manually run baseline experiments push
+# their timings next to the operator's metrics (example/experiments.md).
+nodeSelector:
+  hyperstack.cloud/node-group-name: default   # same pinning as values-hyperstack.yaml; drop on GKE
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: monitoring

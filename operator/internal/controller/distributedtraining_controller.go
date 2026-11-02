@@ -116,7 +116,7 @@ func (r *DistributedTrainingReconciler) getBackend(job *trainingv1.DistributedTr
 // +kubebuilder:rbac:groups=training.distributedtraining.io,resources=distributedtraininghistories,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kubeflow.org,resources=pytorchjobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=sparkoperator.k8s.io,resources=sparkapplications,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
@@ -201,14 +201,20 @@ func (r *DistributedTrainingReconciler) reconcileDelete(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	poolName := r.nodePoolName(job)
-	// If the job already succeeded, the node pool was deleted in the Collecting
-	// phase — skip the GKE call entirely.
-	if job.Status.Phase != trainingv1.PhaseSucceeded {
+
+	switch {
+	case job.Status.Phase == trainingv1.PhaseSucceeded && job.Status.GKEOperationID == "":
+		// Pool deletion already ran and was confirmed in Collecting/Succeeded
+		// (reconcileSucceeded also removed the Node objects). Nothing to wait for.
+		logger.Info("deletion requested — node pool already deleted (job succeeded)", "job", job.Name, "pool", poolName)
+
+	case job.Status.GKEOperationID == "":
 		logger.Info("deletion requested — deleting node pool", "job", job.Name, "pool", poolName)
-		if _, err := r.Cloud.DeleteNodePool(ctx, poolName); err != nil {
+		opID, err := r.Cloud.DeleteNodePool(ctx, poolName)
+		if err != nil {
 			switch status.Code(err) {
 			case codes.NotFound:
-				// Pool already gone — safe to proceed with finalizer removal.
+				// Pool already gone — fall through to node cleanup + finalizer removal.
 			case codes.FailedPrecondition:
 				// Pool exists but is not in a deletable state — typically a
 				// create operation is still in flight. Keep the finalizer,
@@ -220,10 +226,35 @@ func (r *DistributedTrainingReconciler) reconcileDelete(
 				logger.Error(err, "failed to delete node pool during CR deletion", "pool", poolName)
 				return ctrl.Result{}, err
 			}
+		} else {
+			// Record the operation and keep the finalizer until the cloud
+			// confirms the pool is gone. The Node objects are removed only
+			// then: a kubelet whose VM is still alive re-registers a deleted
+			// Node object within seconds, which would leave the stale,
+			// cordoned object behind anyway.
+			patch := client.MergeFrom(job.DeepCopy())
+			job.Status.GKEOperationID = opID
+			if perr := r.Status().Patch(ctx, job, patch); perr != nil {
+				return ctrl.Result{}, fmt.Errorf("recording node pool delete operation: %w", perr)
+			}
+			logger.Info("node pool deletion started — waiting for confirmation before removing finalizer",
+				"pool", poolName, "operation", opID)
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
-	} else {
-		logger.Info("deletion requested — node pool already deleted (job succeeded)", "job", job.Name, "pool", poolName)
+
+	default:
+		done, err := r.Cloud.IsOperationDone(ctx, job.Status.GKEOperationID)
+		if err != nil {
+			logger.Error(err, "polling node pool deletion operation", "operation", job.Status.GKEOperationID)
+		}
+		if err != nil || !done {
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		}
+		logger.Info("node pool deletion confirmed", "pool", poolName)
 	}
+
+	// The cloud no longer has the pool; drop the Node objects it may have left.
+	r.deleteNodesInPool(ctx, poolName)
 
 	// Patch only metadata.finalizers so the API server does not re-validate
 	// the spec (which may fail if e.g. spec.topology.nodes is 0).

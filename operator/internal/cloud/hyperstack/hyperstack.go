@@ -34,11 +34,13 @@ const (
 	// DefaultAPIURL is the Hyperstack core API base URL.
 	DefaultAPIURL = "https://infrahub-api.nexgencloud.com/v1"
 
-	// DefaultNodePoolLabel is the Kubernetes node label assumed to carry the
-	// node-group name. Hyperstack's docs do not specify this label, so it is
-	// overridable via --hyperstack-nodepool-label and must be verified against
+	// DefaultNodePoolLabel is the Kubernetes node label that carries the
+	// node-group name. Verified on a live cluster (k8s 1.36.1, 2026-10-30):
+	// workers carry hyperstack.cloud/node-group-name=<group>, alongside
+	// hyperstack.cloud/node-group-id and hyperstack.cloud/cluster-id. Still
+	// overridable via --hyperstack-nodepool-label and worth re-checking against
 	// a live cluster.
-	DefaultNodePoolLabel = "hyperstack.cloud/node-group"
+	DefaultNodePoolLabel = "hyperstack.cloud/node-group-name"
 
 	// maxNodeGroupNameLen is Hyperstack's hard limit on node-group names.
 	maxNodeGroupNameLen = 20

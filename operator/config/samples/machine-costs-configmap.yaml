@@ -11,7 +11,15 @@ metadata:
   name: machine-costs
   namespace: distributed-training-system
 data:
-  # GCE machine types — on-demand hourly prices (us-central1, approximate)
+  # Keys are whatever spec.hardware.machineType holds: GCE machine types on GKE,
+  # flavor names on Hyperstack. Values are on-demand USD per node-hour.
+
+  # GKE (us-central1, approximate)
   c4-highcpu-8: "0.35"
-  # Add GPU types here as needed
-  # n1-standard-4-gpu: "2.48"
+
+  # Hyperstack flavors (console on-demand price, CANADA-1)
+  n3-A100x1: "1.35"   # 1x A100-80G-PCIe, 28 vCPU, 120 GB RAM
+  n3-L40x1: "1.00"    # 1x L40 48 GB, 28 vCPU, 58 GB RAM
+  # Add CPU flavors (e.g. n1-cpu-small) only with their real price: a missing key
+  # makes the solver fall back to a calibration run, a wrong price corrupts cost
+  # estimates.

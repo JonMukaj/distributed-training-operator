@@ -254,7 +254,7 @@ gcloud projects add-iam-policy-binding YOUR_PROJECT \
 gcloud iam service-accounts add-iam-policy-binding \
   distributed-training-operator@YOUR_PROJECT.iam.gserviceaccount.com \
   --role=roles/iam.workloadIdentityUser \
-  --member="serviceAccount:YOUR_PROJECT.svc.id.goog[operator-system/operator-controller-manager]"
+  --member="serviceAccount:YOUR_PROJECT.svc.id.goog[distributed-training-system/distributed-training-controller-manager]"
 ```
 
 **4. Fill in your project and cluster values** in the overlay patch files:
@@ -282,13 +282,15 @@ and store it as a Kubernetes Secret (the operator reads it from `HYPERSTACK_API_
 never from a command-line flag):
 
 ```sh
-kubectl create secret generic hyperstack-api \
-  --from-literal=api-key=YOUR_HYPERSTACK_API_KEY \
-  -n operator-system
+export HYPERSTACK_API_KEY=YOUR_HYPERSTACK_API_KEY
+make hs-secret        # creates distributed-training-system + the hyperstack-api Secret
 ```
 
-**2. Set your numeric cluster ID** in `config/overlays/hyperstack/manager_args_patch.yaml`
-(the `--hyperstack-cluster-id` flag).
+**2. Set your numeric cluster ID** in `config/overlays/hyperstack/manager_args_patch.yaml`:
+
+```sh
+make hs-configure HYPERSTACK_CLUSTER_ID=<id>
+```
 
 **3. Deploy using the Hyperstack overlay:**
 
@@ -297,6 +299,11 @@ kubectl kustomize config/overlays/hyperstack   # preview
 kubectl apply -k config/overlays/hyperstack
 ```
 
+This deploys the controller image pinned in `config/manager/kustomization.yaml`. To build
+and deploy your own image in one go use `make hs-build-deploy IMG=<image:tag>` — see
+[Step 5 — Build and deploy the operator](#step-5--build-and-deploy-the-operator)
+in the Hyperstack development section.
+
 Notes and differences from GKE:
 
 - **Machine types are Hyperstack flavor names** (e.g. `n1-cpu-small`); a flavor bundles
@@ -304,8 +311,23 @@ Notes and differences from GKE:
 - Node-group names are limited to **20 characters**.
 - Readiness is observed by polling node status (`ACTIVE`) through the Hyperstack API.
   The controller additionally counts Ready Kubernetes nodes using the
-  `--hyperstack-nodepool-label` label (default `hyperstack.cloud/node-group`) — verify
-  this against `kubectl get nodes --show-labels` on your cluster and override if needed.
+  `--hyperstack-nodepool-label` label (default `hyperstack.cloud/node-group-name`, verified
+  on a live cluster; re-check with `kubectl get nodes --show-labels` after platform upgrades).
+  **The same label is used as the replica pods' `nodeSelector`**, so if it is wrong the
+  node group comes up but the PyTorchJob pods stay `Pending`.
+- Node-group names must be ≤ 20 characters. The operator derives `dj-<CR name>`; for a
+  longer CR name set `spec.hardware.nodePoolName` explicitly (see the GPU sample).
+- Hyperstack does not remove the Kubernetes `Node` objects of a deleted node group (they
+  linger as `NotReady,SchedulingDisabled`; GKE's cloud controller does this for you). The
+  operator therefore deletes the pool's non-Ready Node objects itself once the cloud has
+  confirmed the pool is gone — after a successful run and when a CR is deleted. Deleting
+  a CR consequently keeps its finalizer until the node group is confirmed deleted
+  (`kubectl delete dj … ` returns when the pool is gone).
+- Result collection runs in parallel with node-group deletion. The reader pod that cats
+  `all_results.json` off the PVC carries a node anti-affinity on the pool label so it is
+  never scheduled onto the node being torn down; Hyperstack deletes VMs fast enough that
+  this race lost a whole run's metrics before the fix (symptom: `job complete — 0 metrics
+  collected` and a `HistorySkipped` event while the files exist on the NFS export).
 
 #### Adding support for another cloud provider
 
@@ -328,6 +350,11 @@ kubectl apply -k config/samples/
 ```
 
 > **NOTE**: Ensure that the samples has default values to test it out.
+> This applies the PVC and the CPU (GKE) sample only. The GPU sample targets
+> Hyperstack (`config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml`)
+> and is applied on its own — see
+> [Step 7 — Run the GPU fine-tuning sample](#step-7--run-the-gpu-fine-tuning-sample)
+> in the Hyperstack section.
 
 ### To Uninstall
 
@@ -469,7 +496,9 @@ kubectl wait --for=condition=Available deployment/training-operator -n kubeflow 
 
 ### Step 5 — Deploy the controller
 
-The `gke-rebuild` Makefile target handles namespace creation, image build/push, and deployment in one command:
+The `gke-rebuild` Makefile target handles image build/push, deployment and a sample run in
+one command (it is `make cloud-rebuild CLOUD=gke`; every `gke-*` target has an `hs-*` twin
+for Hyperstack and a generic `cloud-*` form, see `make help`):
 
 ```sh
 make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
@@ -477,10 +506,10 @@ make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
 
 This runs the following steps internally:
 
-1. Creates the `operator-system` namespace (idempotent)
-2. Builds and pushes the Docker image
-3. Applies `config/overlays/gke/` via kubectl
-4. Rolls out the deployment and waits for it to be ready
+1. Checks the overlay for unfilled `YOUR_*` placeholders
+2. Builds and pushes the Docker image and writes it into `config/manager/kustomization.yaml`
+3. Applies `config/overlays/gke/` (which creates the `distributed-training-system` namespace) and the machine-costs ConfigMap
+4. Waits for the deployment rollout
 5. Deletes and re-applies the sample `DistributedTraining` CR
 
 The controller authenticates to GCP via **Workload Identity** — the GKE metadata server issues
@@ -506,8 +535,10 @@ No credential files are mounted inside the pod.
 kubectl get dj -w
 
 # Tail controller logs
-kubectl logs -f -n operator-system deploy/operator-controller-manager
+kubectl logs -f -n distributed-training-system deploy/distributed-training-controller-manager
 ```
+
+(or `make gke-watch` / `make gke-logs`.)
 
 Expected phase sequence: `Pending → Provisioning → Ready → Running → Collecting → Succeeded`
 
@@ -550,6 +581,10 @@ This section covers the operator development workflow on a
 The operator manages Hyperstack **node groups** (instead of GKE node pools) via its
 `hyperstack` cloud provider.
 
+> **Working directory.** Steps 1–2 run from `example/infra/hyperstack/` (Terraform).
+> From Step 3 on, every command runs from `operator/`, where the Makefile lives; paths
+> into `example/` are therefore written as `../example/...`.
+
 ### Prerequisites
 
 - **Tooling:** `go` v1.25.3+, `docker` 17.03+, `kubectl` v1.11.3+, `helm` 3+,
@@ -571,12 +606,16 @@ The operator manages Hyperstack **node groups** (instead of GKE node pools) via 
 ### Step 1 — Provision the cluster (Terraform)
 
 ```sh
-cd example/infra/hyperstack
+cd example/infra/hyperstack          # from the repository root
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars: environment_name, keypair_name, cluster_name
 terraform init
 terraform apply
 ```
+
+Terraform manages the cloud resource only. Everything inside the cluster (CSI drivers,
+NFS, Kubeflow, the operator, monitoring) is installed with `kubectl`/`helm` from
+`operator/` in the following steps.
 
 Record the cluster ID for the operator overlay:
 
@@ -588,37 +627,69 @@ terraform output cluster_id
 
 ### Step 2 — Connect kubectl to the cluster
 
-The cluster's `kube_config` field (on the cluster-detail response) holds a
-base64-encoded kubeconfig. Retrieve it, decode it, and point `kubectl` at it — replace
-`<cluster_id>` with the ID from Step 1:
+Terraform already holds the cluster's kubeconfig (client-certificate auth) as a sensitive
+output; write it to a file and point `kubectl` at it:
 
 ```sh
-B64_KUBECONFIG=$(curl -s https://infrahub-api.nexgencloud.com/v1/core/clusters/<cluster_id> \
-  -H "api_key: $HYPERSTACK_API_KEY" | jq -r '.cluster.kube_config')
-
-echo "$B64_KUBECONFIG" | base64 -d > kubeconfig.yaml
+terraform output -raw kubeconfig > kubeconfig.yaml      # gitignored
 export KUBECONFIG=$PWD/kubeconfig.yaml
 kubectl get nodes
 ```
 
+<details>
+<summary>Without Terraform: fetch it from the API</summary>
+
+```sh
+B64_KUBECONFIG=$(curl -s https://infrahub-api.nexgencloud.com/v1/core/clusters/<cluster_id> \
+  -H "api_key: $HYPERSTACK_API_KEY" | jq -r '.cluster.kube_config')
+echo "$B64_KUBECONFIG" | base64 -d > kubeconfig.yaml
+```
+</details>
+
 ---
 
 ### Step 3 — Install cluster dependencies
+
+```sh
+cd ../../../operator                 # all remaining steps run from operator/
+```
 
 **CSI driver** (dynamic block storage for the NFS server):
 
 ```sh
 helm repo add nexgencloud https://nexgencloud.github.io/csi-hyperstack
 helm repo update
-helm install csi-hyperstack nexgencloud/csi-hyperstack \
-  --namespace kube-system --set hyperstack.apiKey=$HYPERSTACK_API_KEY
+helm install csi-hyperstack nexgencloud/csi-hyperstack --namespace kube-system --set hyperstack.apiKey=$HYPERSTACK_API_KEY
+# Wait until the node plugin has registered on every node; applying the NFS server
+# before that fails its first attach with "CSINode ... does not contain driver
+# hyperstack.csi.nexgencloud.com" (it would retry and recover, but the wait avoids the noise).
+kubectl rollout status -n kube-system ds/csi-hyperstack-node --timeout=180s
+kubectl get csinode -o custom-columns='NODE:.metadata.name,DRIVERS:.spec.drivers[*].name'   # expect hyperstack.csi.nexgencloud.com on the workers
 ```
 
-**NFS server** (re-exports an RWO volume as the `ReadWriteMany` output PVC the jobs use):
+**NFS server** (re-exports an RWO volume as `ReadWriteMany`):
 
 ```sh
-kubectl apply -f example/infra/demo/nfs-hyperstack.yaml
+kubectl apply -f ../example/infra/demo/nfs-hyperstack.yaml
+kubectl wait --for=condition=Available deployment/nfs-server --timeout=180s
 ```
+
+**NFS CSI driver and the shared output PVC** every job references as `spec.outputPVCName`.
+Hyperstack node images have no NFS client, so the in-tree `nfs:` volume used on GKE
+(`config/samples/pvc.yaml`) fails there with `bad option; ... you might need a
+/sbin/mount.nfs helper`. The CSI driver mounts from inside its own pod instead:
+
+```sh
+helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+helm repo update
+helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs --namespace kube-system
+kubectl rollout status -n kube-system ds/csi-nfs-node --timeout=180s
+kubectl apply -f config/samples/pvc-nfs-csi.yaml       # NOT pvc.yaml on Hyperstack
+```
+
+> Switching an existing cluster from `pvc.yaml`: delete any running `DistributedTraining`
+> first (its pod holds the claim), then `kubectl delete -f config/samples/pvc.yaml` and
+> apply `pvc-nfs-csi.yaml`. Data on the NFS server is untouched; only the PV object changes.
 
 **Kubeflow Training Operator** (required for `PyTorchJob` support):
 
@@ -629,30 +700,81 @@ kubectl wait --for=condition=Available deployment/training-operator -n kubeflow 
 
 ---
 
-### Step 4 — Configure the Hyperstack overlay
+### Step 3b — Monitoring: Prometheus, Grafana, Pushgateway
 
-Create the namespace and the API-key secret the operator reads:
+With the CSI driver in place (the Prometheus volume comes from it):
 
 ```sh
-kubectl create namespace operator-system
-kubectl create secret generic hyperstack-api \
-  --from-literal=api-key=$HYPERSTACK_API_KEY \
-  -n operator-system
+make monitoring-install CLOUD=hyperstack GRAFANA_PASSWORD=<password>   # default admin
+kubectl -n monitoring get pods
 ```
 
-Set your cluster ID (from Step 1) in
-`config/overlays/hyperstack/manager_args_patch.yaml` (the `--hyperstack-cluster-id` flag).
+This applies the `prometheus-retain` StorageClass, installs kube-prometheus-stack and the
+Pushgateway into `monitoring` with `config/monitoring/values-hyperstack.yaml`, publishes
+the operator dashboard (`kubectl apply -k config/grafana`) and creates the ServiceMonitor
+(`config/monitoring/servicemonitor.yaml`) that scrapes the operator's plain-HTTP metrics
+Service on port 8080 — that Service is part of the Hyperstack overlay
+(`config/prometheus-http`), so it arrives with the operator in Step 5.
 
-> **Node label:** the operator counts Ready nodes using the
-> `--hyperstack-nodepool-label` flag (default `hyperstack.cloud/node-group`). Verify it
-> against your cluster with `kubectl get nodes --show-labels` and override it in the
-> overlay if the node-group label differs.
+Design points, all in `config/monitoring/`:
+
+- Prometheus/Grafana/Pushgateway are pinned to the base worker group via
+  `hyperstack.cloud/node-group-name: default`. Ephemeral GPU node groups carry no taint on
+  Hyperstack, so without the pin Prometheus could land on a GPU node and die, volume
+  attached, when the operator deletes that group.
+- The TSDB lives on a Hyperstack `Cloud-SSD` volume (`prometheus-retain`,
+  `reclaimPolicy: Retain`, 10Gi, retention 90d). Retain means the volume outlives the PVC —
+  `make monitoring-uninstall` deletes the PVC so it is detached before a cluster teardown.
+
+Open Grafana:
+
+```sh
+make monitoring-grafana          # http://localhost:3000 → dashboard "DistributedTraining Operator"
+```
+
+---
+
+### Step 4 — Configure the Hyperstack overlay
+
+Write the cluster ID (from Step 1) into the overlay, then create the namespace and the
+API-key Secret (read from `$HYPERSTACK_API_KEY`):
+
+```sh
+make hs-configure HYPERSTACK_CLUSTER_ID=<id> HYPERSTACK_GPU_FLAVOR=n3-L40x1
+make hs-init
+```
+
+`hs-configure` edits `config/overlays/hyperstack/manager_args_patch.yaml` in place
+(`--hyperstack-cluster-id`, `--default-gpu-machine-type`); `hs-init` creates
+`distributed-training-system` and the `hyperstack-api` Secret in it.
+
+The node label the operator uses to find a node group's nodes is the platform label
+`hyperstack.cloud/node-group-name`, which Hyperstack puts on every worker. It is the
+built-in default, so nothing to configure. Should a platform upgrade ever rename it,
+find the new key and pass it once as `HYPERSTACK_NODE_LABEL=<key>`:
+
+```sh
+# list a worker's hyperstack.cloud/* labels; the key whose value is the group name
+# (e.g. "default") is the one the operator needs
+kubectl get node $(kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}') \
+  -o jsonpath='{.metadata.labels}' | tr ',' '\n' | grep hyperstack
+
+kubectl get nodes -L hyperstack.cloud/node-group-name
+```
+
+> **Node label matters twice.** The operator counts Ready nodes with it **and** pins the
+> training pods to the node group with a `nodeSelector` on it. With a wrong label the
+> node group comes up and the PyTorchJob pods stay `Pending`.
+>
+> The manager runs in `distributed-training-system` (set by `config/default/kustomization.yaml`,
+> which also prefixes every resource with `distributed-training-`). The Secret must live in
+> that namespace or the pod fails with `CreateContainerConfigError`.
 
 ---
 
 ### Step 5 — Build and deploy the operator
 
-Install the CRDs, build/push the image, and apply the Hyperstack overlay:
+Install the CRDs, then build, push and deploy in one step:
 
 ```sh
 # Regenerate manifests/deepcopy after any API change
@@ -661,13 +783,15 @@ make manifests generate
 # Install CRDs
 make install
 
-# Build and push the controller image
-make docker-build docker-push IMG=jmukaj/distributed-training-operator:<tag>
-
-# Deploy with the Hyperstack overlay
-kubectl apply -k config/overlays/hyperstack
-kubectl rollout status -n operator-system deploy/operator-controller-manager
+# Build + push the controller image, point the manifests at it, deploy the Hyperstack
+# overlay and the machine-costs ConfigMap, wait for the rollout
+make hs-build-deploy IMG=jmukaj/distributed-training-operator:<tag>
 ```
+
+`hs-build-deploy` refuses to run while the overlay still has `YOUR_*` placeholders
+(`make cloud-check CLOUD=hyperstack` runs the same test). To change only overlay flags
+without rebuilding, use `make hs-apply-config`; note it also resets the sample CR, which on
+Hyperstack is the paid GPU sample.
 
 > **Local dev loop:** to iterate without building an image, run the controller locally
 > against the cluster (uses your current kubeconfig). `make run` takes no flags, so pass
@@ -685,14 +809,116 @@ After editing `*.go` files run `make lint` and `make test` before committing.
 ### Step 6 — Watch the operator
 
 ```sh
-# Watch phase transitions
-kubectl get dj -w
-
-# Tail controller logs
-kubectl logs -f -n operator-system deploy/operator-controller-manager
+make hs-watch     # kubectl get dj -A -w
+make hs-logs      # kubectl logs -f -n distributed-training-system deploy/distributed-training-controller-manager
 ```
 
 Expected phase sequence: `Pending → Provisioning → Ready → Running → Collecting → Succeeded`
+
+With Step 3b in place the same run shows up in Grafana (provisioning/training seconds,
+nodes, cost, solver α and estimates, training metrics incl. the transfer fractions):
+
+```sh
+make monitoring-grafana
+```
+
+---
+
+### Step 7 — Run the GPU fine-tuning sample
+
+`config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml` is the GPU
+counterpart of the CPU sample: the same smol_llama-101M-GQA LoRA workload on an
+ephemeral **`n3-L40x1`** node group (one NVIDIA L40 48 GB per node, 28 vCPU, 58 GB RAM,
+region CANADA-1; `n3-A100x1` is the commented alternative in the file), image
+`jmukaj/gpu-fine-tuner-hf:v2.1.0`. It is
+deliberately *not* in `config/samples/kustomization.yaml`, so `kubectl apply -k
+config/samples/` never starts a GPU job by accident.
+
+**Prerequisites (once per cluster)**
+
+1. Hyperstack CSI driver, NFS server, NFS CSI driver and the shared PVC from Step 3
+   (`../example/infra/demo/nfs-hyperstack.yaml`, `config/samples/pvc-nfs-csi.yaml`), and the
+   Kubeflow training operator.
+2. The flavor's hourly price in the machine-costs ConfigMap — needed only for
+   objective mode. `config/samples/machine-costs-configmap.yaml` lists
+   `n3-L40x1: "1.00"` and `n3-A100x1: "1.35"` (console on-demand prices);
+   `hs-build-deploy` applies the ConfigMap. Without a price for the flavor in use,
+   objective-mode CRs fall back to a calibration run.
+3. The node-group label (`hyperstack.cloud/node-group-name`, the built-in default; see
+   Step 4). The sample pins pods to the node group with it; a wrong label leaves the pods
+   `Pending`.
+4. For gated models only: `kubectl create secret generic hf-token-secret
+   --from-literal=token=<hf_...>` and uncomment `model.hfTokenSecret`. Never commit
+   the token.
+
+NVIDIA drivers and the device plugin are preinstalled on Hyperstack clusters; nothing
+to apply. Hyperstack flavors bundle their GPU, so `hardware.gpuType`/`gpuCount` are
+ignored and the sample pins the GPU with the `nvidia.com/gpu: "1"` limit.
+
+**Run sequence** — the solver needs two node counts in history before it can fit α:
+
+```sh
+# Calibration run 1 (nodes: 1 as shipped)
+kubectl apply -f config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
+kubectl get dj distributedtraining-llm-gpu-1 -w        # wait for Succeeded
+
+# Calibration run 2: set topology.nodes: 2, a new metadata.name and a new
+# hardware.nodePoolName (≤ 20 chars), apply again.
+
+# Confirm both history entries exist
+kubectl get distributedtraininghistories
+
+# Objective run: uncomment the second document in the file (solver picks the node
+# count), apply, and check the chosen topology before the node group is provisioned.
+kubectl get dj distributedtraining-llm-gpu-obj-1 -o jsonpath='{.status.resolvedTopology}{"\n"}'
+```
+
+All three CRs must keep identical `model`, `dataset` and `training` fields: they form
+the config hash that groups history entries (see [Config hash](#config-hash)).
+Watch the node group appear and disappear in the Hyperstack console under the
+cluster's **Node groups** tab.
+
+**Reading the results**
+
+```sh
+kubectl get dj distributedtraining-llm-gpu-1 -o jsonpath='{.status.results}' | jq .
+kubectl get distributedtraininghistories -o yaml      # throughput, α inputs, cost per run
+```
+
+Raw files (`all_results.json`, `transfer_profile.json`, `train_results.json`,
+`eval_results.json`, `trainer_state.json` with the per-step loss curve; the `v2.1.0` image
+carries the instrumented `script/gpu/finetune.py`) land under `/exports/checkpoints` on the
+NFS server — and **every job overwrites them**, since all jobs share that output directory.
+Archive each run before starting the next:
+
+```sh
+make hs-archive-results CR=distributedtraining-llm-gpu-3           # RUN=<dir name> defaults to the CR name
+```
+
+This copies the JSON files to `/exports/results/<RUN>/` on the PVC (outside the path the next
+job overwrites), pulls them to `../results/<RUN>/` on your machine (`RESULTS_DIR` to change),
+and dumps the CR (`cr.yaml`) and its history entry (`history.yaml`) next to them.
+
+The first run on a fresh PVC downloads the model and dataset into `/mnt/output/hf-cache`
+(`HF_HOME` in the sample), so its training time is inflated. Treat it as a warm-up and
+do not use it as a measured run.
+
+> **How the operator attributes time.** `provisioning_seconds` runs from the node-pool
+> request until every node is kubelet-Ready **and, for GPU jobs, advertises an allocatable
+> `nvidia.com/gpu`** — the device plugin needs ~2 min after a fresh node joins, and that
+> wait belongs to provisioning. `training_seconds` runs from the PyTorchJob's `Running`
+> condition (all replica pods running) to its completion, so pod scheduling and image pull
+> sit between the two and in neither. Provisioning fails after 30 min if the nodes never
+> become usable. (Before these two changes the first Hyperstack runs booked a 173 s
+> training loop as 399 s of training time and the solver fitted α≈1 to infrastructure
+> overhead.)
+
+Delete a finished CR when you no longer need its status (the node group is already
+torn down by the operator):
+
+```sh
+kubectl delete dj distributedtraining-llm-gpu-1
+```
 
 ---
 
@@ -703,22 +929,37 @@ deleted while the CSI volume is still attached, the volume gets stuck in Hyperst
 `RESERVED` state — still billed, and recoverable only via the console or support.
 
 ```sh
-# 1. Remove workloads so the CSI driver detaches the volume (→ AVAILABLE) while the
+# 1. Remove workloads so the CSI driver detaches the volumes (→ AVAILABLE) while the
 #    nodes still exist.
-kubectl delete -f example/infra/demo/nfs-hyperstack.yaml         # NFS server + PVC
-kubectl delete -k config/overlays/hyperstack       # controller
-make uninstall                                      # CRDs
+make hs-clean                                       # CRs (waits for node groups to go), controller, CRDs
+kubectl delete -f config/samples/pvc-nfs-csi.yaml   # shared output PVC/PV
+kubectl delete -f ../example/infra/demo/nfs-hyperstack.yaml      # NFS server + CSI-backed disk PVC
 
-# 2. Destroy the cluster.
-cd example/infra/hyperstack && terraform destroy
+# 2. Monitoring: Helm does not delete the Prometheus StatefulSet's PVC; this target
+#    uninstalls the charts AND deletes the PVC so the Retain volume is detached before
+#    the node VMs go (otherwise it gets stuck RESERVED).
+make monitoring-uninstall
+
+# 3. Destroy the cluster.
+cd ../example/infra/hyperstack && terraform destroy
 ```
 
-> **Retain note:** the `nfs-retain` StorageClass uses `reclaimPolicy: Retain`, so
-> deleting the PVC **detaches** the Hyperstack volume but does **not** delete it — the
-> volume (with your dataset) stays on the
-> [Volumes page](https://console.hyperstack.cloud/volumes) and keeps billing. Delete it
-> there when you no longer need the data, or set the StorageClass to
-> `reclaimPolicy: Delete` to have the CSI driver remove it automatically with the PVC.
+> **Volume lifecycle.** The NFS disk's `nfs-hyperstack` StorageClass uses
+> `reclaimPolicy: Delete`: deleting the `nfs-disk` PVC deletes the Hyperstack volume, so
+> nothing keeps billing — and the HF cache, checkpoints and anything under
+> `/exports/results` go with it. Archive every run first (`make hs-archive-results`).
+> The Prometheus volume (`prometheus-retain`) is kept on purpose; after
+> `make monitoring-uninstall` it sits detached on the
+> [Volumes page](https://console.hyperstack.cloud/volumes) until you delete it there.
+>
+> Switching an existing cluster from the former `nfs-retain` class: StorageClasses are
+> immutable, so `kubectl delete sc nfs-retain`, re-apply `nfs-hyperstack.yaml`, and patch
+> the already-provisioned PV, whose policy was fixed when it was created:
+>
+> ```sh
+> kubectl patch pv $(kubectl get pvc nfs-disk -o jsonpath='{.spec.volumeName}') \
+>   -p '{"spec":{"persistentVolumeReclaimPolicy":"Delete"}}'
+> ```
 
 ---
 

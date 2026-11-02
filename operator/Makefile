@@ -146,45 +146,204 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	"$(KUSTOMIZE)" build config/default > dist/install.yaml
 
-##@ GKE Deployment
+##@ Cloud Deployment (GKE or Hyperstack)
 
-OVERLAY        ?= config/overlays/gke
+# One set of targets for both clouds. Pick the cloud with CLOUD=gke (default)
+# or CLOUD=hyperstack; the overlay and sample CR follow from it. The gke-* and
+# hs-* targets below are shorthands that pin CLOUD, so
+#   make hs-build-deploy IMG=...   ==   make cloud-build-deploy CLOUD=hyperstack IMG=...
+CLOUD          ?= gke
+OVERLAY        ?= config/overlays/$(CLOUD)
+OPERATOR_NS    ?= distributed-training-system
+MANAGER_DEPLOY ?= distributed-training-controller-manager
+ifeq ($(CLOUD),hyperstack)
+SAMPLE_CR      ?= config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
+else
+SAMPLE_CR      ?= config/samples/training_v1_distributedtraining.yaml
+endif
 ADC_CREDS_FILE ?= $(HOME)/.config/gcloud/application_default_credentials.json
 
-.PHONY: gke-init
-gke-init: ## Create operator-system namespace and GCP ADC secret (idempotent).
-	kubectl create namespace distributed-training-system --dry-run=client -o yaml | kubectl apply -f -
+.PHONY: cloud-check
+cloud-check: ## Fail if $(OVERLAY) still contains YOUR_* placeholders (cluster ID, project, ...).
+	@test -d $(OVERLAY) || { echo "unknown CLOUD=$(CLOUD): $(OVERLAY) not found"; exit 1; }
+	@if grep -v '^\s*#' $(OVERLAY)/manager_args_patch.yaml | grep -q 'YOUR_'; then \
+		echo "$(OVERLAY)/manager_args_patch.yaml still has placeholders:"; \
+		grep -v '^\s*#' $(OVERLAY)/manager_args_patch.yaml | grep -n 'YOUR_'; \
+		echo "(Hyperstack: run 'make hs-configure HYPERSTACK_CLUSTER_ID=<id>')"; exit 1; fi
+
+.PHONY: cloud-init
+cloud-init: ## Create the operator namespace (and, on Hyperstack, the API-key Secret from the HYPERSTACK_API_KEY env var).
+	kubectl create namespace $(OPERATOR_NS) --dry-run=client -o yaml | kubectl apply -f -
+ifeq ($(CLOUD),hyperstack)
+	$(MAKE) hs-secret
+endif
 # 	kubectl create secret generic gcp-adc \
 # 		--from-file=application_default_credentials.json=$(ADC_CREDS_FILE) \
-# 		--namespace=operator-system \
+# 		--namespace=$(OPERATOR_NS) \
 # 		--dry-run=client -o yaml | kubectl apply -f -
 
-.PHONY: gke-build-deploy
-gke-build-deploy: docker-build docker-push ## Build image, push to registry, and deploy controller to GKE.
+.PHONY: cloud-build-deploy
+cloud-build-deploy: cloud-check docker-build docker-push ## Build + push $(IMG), point manifests at it, apply $(OVERLAY) and the machine-costs ConfigMap.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
 	kubectl apply -k $(OVERLAY)
 	kubectl apply -f config/samples/machine-costs-configmap.yaml
+	kubectl rollout status -n $(OPERATOR_NS) deploy/$(MANAGER_DEPLOY) --timeout=180s
 
-.PHONY: gke-reset-cr
-gke-reset-cr: ## Delete all DistributedTraining CRs and re-apply the sample.
-	kubectl delete distributedtraining --all --all-namespaces --ignore-not-found=true
-	kubectl apply -f config/samples/training_v1_distributedtraining.yaml
-	kubectl apply -f config/samples/machine-costs-configmap.yaml
-
-.PHONY: gke-apply-config
-gke-apply-config: gke-init ## Apply overlay config changes (no rebuild), wait for controller, then reset sample CR.
+.PHONY: cloud-apply-config
+cloud-apply-config: cloud-check cloud-init ## Re-apply $(OVERLAY) without rebuilding, wait for the controller, then reset the sample CR.
 	kubectl apply -k $(OVERLAY)
-	kubectl wait --for=condition=Available deployment/distributed-training-controller-manager -n distributed-training-system --timeout=120s
-	$(MAKE) gke-reset-cr
+	kubectl wait --for=condition=Available deployment/$(MANAGER_DEPLOY) -n $(OPERATOR_NS) --timeout=120s
+	$(MAKE) cloud-reset-cr CLOUD=$(CLOUD)
 
-.PHONY: gke-rebuild
-gke-rebuild: gke-build-deploy gke-reset-cr ## Full redeploy: build, push, deploy controller, and reset sample CR.
+.PHONY: cloud-reset-cr
+cloud-reset-cr: ## Delete all DistributedTraining CRs and apply $(SAMPLE_CR). Hyperstack: that is the GPU sample (provisions a paid node group).
+	kubectl delete distributedtraining --all --all-namespaces --ignore-not-found=true
+	kubectl apply -f config/samples/machine-costs-configmap.yaml
+	kubectl apply -f $(SAMPLE_CR)
 
-.PHONY: gke-clean
-gke-clean: ## Delete controller deployment, all DistributedTraining CRs, and uninstall CRDs.
+.PHONY: cloud-rebuild
+cloud-rebuild: cloud-build-deploy cloud-reset-cr ## Full redeploy: build, push, deploy controller, reset sample CR.
+
+.PHONY: cloud-watch
+cloud-watch: ## Watch DistributedTraining phase transitions.
+	kubectl get dj -A -w
+
+.PHONY: cloud-logs
+cloud-logs: ## Tail the controller logs.
+	kubectl logs -f -n $(OPERATOR_NS) deploy/$(MANAGER_DEPLOY)
+
+.PHONY: cloud-clean
+cloud-clean: ## Delete all CRs (waits for node pools/groups to go), the controller ($(OVERLAY)) and the CRDs.
 	kubectl delete distributedtraining --all --all-namespaces --ignore-not-found=true --wait=true
 	kubectl delete -k $(OVERLAY) --ignore-not-found=true
 	$(MAKE) uninstall ignore-not-found=true
+
+# ---------------------------------------------------------------------------
+# Archiving a run. Every job writes to the same /mnt/output/checkpoints, so the
+# raw JSON files (all_results.json, transfer_profile.json, train/eval_results,
+# trainer_state.json with the per-step loss curve) are overwritten by the next
+# run. Only the history CR persists the key numbers. Run this after each job.
+# ---------------------------------------------------------------------------
+NFS_NS      ?= default
+RESULTS_DIR ?= ../results
+RUN         ?= $(CR)
+
+.PHONY: archive-results
+archive-results: ## Copy the last run's JSON files off the PVC + dump its CR and history to $(RESULTS_DIR)/$(RUN)/. Usage: make archive-results CR=<DistributedTraining name> [RUN=<dir name>]
+	@test -n "$(CR)" || { echo "usage: make archive-results CR=<DistributedTraining name> [RUN=<dir name, default CR>] [RESULTS_DIR=$(RESULTS_DIR)]"; exit 1; }
+	@NFS=$$(kubectl -n $(NFS_NS) get pod -l role=nfs-server -o jsonpath='{.items[0].metadata.name}'); \
+	test -n "$$NFS" || { echo "no nfs-server pod (label role=nfs-server) in namespace $(NFS_NS)"; exit 1; }; \
+	echo "archiving /exports/checkpoints/*.json from $$NFS into /exports/results/$(RUN)/ and $(RESULTS_DIR)/$(RUN)/"; \
+	kubectl -n $(NFS_NS) exec $$NFS -- sh -c 'mkdir -p /exports/results/$(RUN) && cp /exports/checkpoints/*.json /exports/results/$(RUN)/ && ls -la /exports/results/$(RUN)'; \
+	mkdir -p $(RESULTS_DIR)/$(RUN); \
+	kubectl -n $(NFS_NS) exec $$NFS -- tar cf - -C /exports/results/$(RUN) . | tar xf - -C $(RESULTS_DIR)/$(RUN)
+	@kubectl get distributedtraining $(CR) -o yaml > $(RESULTS_DIR)/$(RUN)/cr.yaml 2>/dev/null \
+		&& echo "wrote cr.yaml" || echo "CR $(CR) not found — skipped cr.yaml"
+	@kubectl get distributedtraininghistories -A -o name 2>/dev/null | grep "djh-$(CR)-" | \
+		xargs -r kubectl get -o yaml > $(RESULTS_DIR)/$(RUN)/history.yaml; \
+		test -s $(RESULTS_DIR)/$(RUN)/history.yaml && echo "wrote history.yaml" || { rm -f $(RESULTS_DIR)/$(RUN)/history.yaml; echo "no history entry for $(CR) (HistorySkipped?)"; }
+	@ls -la $(RESULTS_DIR)/$(RUN)
+
+##@ GKE shorthands (CLOUD=gke)
+
+.PHONY: gke-init gke-build-deploy gke-apply-config gke-reset-cr gke-rebuild gke-clean gke-watch gke-logs gke-archive-results
+gke-init: ## = cloud-init CLOUD=gke
+	$(MAKE) cloud-init CLOUD=gke
+gke-build-deploy: ## = cloud-build-deploy CLOUD=gke
+	$(MAKE) cloud-build-deploy CLOUD=gke IMG=$(IMG)
+gke-apply-config: ## = cloud-apply-config CLOUD=gke
+	$(MAKE) cloud-apply-config CLOUD=gke
+gke-reset-cr: ## = cloud-reset-cr CLOUD=gke
+	$(MAKE) cloud-reset-cr CLOUD=gke
+gke-rebuild: ## = cloud-rebuild CLOUD=gke
+	$(MAKE) cloud-rebuild CLOUD=gke IMG=$(IMG)
+gke-clean: ## = cloud-clean CLOUD=gke
+	$(MAKE) cloud-clean CLOUD=gke
+gke-watch: ## = cloud-watch
+	$(MAKE) cloud-watch
+gke-logs: ## = cloud-logs
+	$(MAKE) cloud-logs
+gke-archive-results: ## = archive-results CR=<name>
+	$(MAKE) archive-results CR=$(CR) RUN=$(RUN)
+
+##@ Hyperstack shorthands (CLOUD=hyperstack)
+
+HYPERSTACK_PATCH ?= config/overlays/hyperstack/manager_args_patch.yaml
+
+.PHONY: hs-configure
+hs-configure: ## Write HYPERSTACK_CLUSTER_ID (required), HYPERSTACK_NODE_LABEL and HYPERSTACK_GPU_FLAVOR (optional) into the Hyperstack overlay.
+	@test -n "$(HYPERSTACK_CLUSTER_ID)" || { echo "usage: make hs-configure HYPERSTACK_CLUSTER_ID=<numeric id> [HYPERSTACK_NODE_LABEL=<node label>] [HYPERSTACK_GPU_FLAVOR=<flavor>]"; exit 1; }
+	sed -i 's#--hyperstack-cluster-id=.*#--hyperstack-cluster-id=$(HYPERSTACK_CLUSTER_ID)#' $(HYPERSTACK_PATCH)
+	@if [ -n "$(HYPERSTACK_NODE_LABEL)" ]; then sed -i 's#--hyperstack-nodepool-label=.*#--hyperstack-nodepool-label=$(HYPERSTACK_NODE_LABEL)#' $(HYPERSTACK_PATCH); fi
+	@if [ -n "$(HYPERSTACK_GPU_FLAVOR)" ]; then sed -i 's#--default-gpu-machine-type=.*#--default-gpu-machine-type=$(HYPERSTACK_GPU_FLAVOR)#' $(HYPERSTACK_PATCH); fi
+	@grep -n 'hyperstack-cluster-id\|hyperstack-nodepool-label\|default-gpu-machine-type' $(HYPERSTACK_PATCH)
+
+.PHONY: hs-secret
+hs-secret: ## Create/update the hyperstack-api Secret in the operator namespace from the HYPERSTACK_API_KEY env var.
+	@test -n "$$HYPERSTACK_API_KEY" || { echo "HYPERSTACK_API_KEY is not exported"; exit 1; }
+	kubectl create namespace $(OPERATOR_NS) --dry-run=client -o yaml | kubectl apply -f -
+	@kubectl create secret generic hyperstack-api --from-literal=api-key="$$HYPERSTACK_API_KEY" \
+		-n $(OPERATOR_NS) --dry-run=client -o yaml | kubectl apply -f -
+
+.PHONY: hs-init hs-build-deploy hs-apply-config hs-reset-cr hs-rebuild hs-clean hs-watch hs-logs hs-archive-results
+hs-init: ## = cloud-init CLOUD=hyperstack (namespace + API-key Secret)
+	$(MAKE) cloud-init CLOUD=hyperstack
+hs-build-deploy: ## = cloud-build-deploy CLOUD=hyperstack
+	$(MAKE) cloud-build-deploy CLOUD=hyperstack IMG=$(IMG)
+hs-apply-config: ## = cloud-apply-config CLOUD=hyperstack
+	$(MAKE) cloud-apply-config CLOUD=hyperstack
+hs-reset-cr: ## = cloud-reset-cr CLOUD=hyperstack (applies the paid GPU sample)
+	$(MAKE) cloud-reset-cr CLOUD=hyperstack
+hs-rebuild: ## = cloud-rebuild CLOUD=hyperstack
+	$(MAKE) cloud-rebuild CLOUD=hyperstack IMG=$(IMG)
+hs-clean: ## = cloud-clean CLOUD=hyperstack
+	$(MAKE) cloud-clean CLOUD=hyperstack
+hs-watch: ## = cloud-watch
+	$(MAKE) cloud-watch
+hs-logs: ## = cloud-logs
+	$(MAKE) cloud-logs
+hs-archive-results: ## = archive-results CR=<name>
+	$(MAKE) archive-results CR=$(CR) RUN=$(RUN)
+
+##@ Monitoring (Prometheus + Grafana + Pushgateway)
+
+# kube-prometheus-stack + Pushgateway via Helm, the operator dashboard and the
+# operator ServiceMonitor via kubectl. Cloud-specific values live in
+# config/monitoring/values-$(CLOUD).yaml (Hyperstack provided; GKE keeps its
+# Terraform-managed stack in example/infra/gcp/grafana.tf).
+MONITORING_NS      ?= distributed-training-system
+MONITORING_VALUES  ?= config/monitoring/values-$(CLOUD).yaml
+MONITORING_SC      ?= config/monitoring/storageclass-$(CLOUD).yaml
+GRAFANA_PASSWORD   ?= admin
+
+.PHONY: monitoring-install
+monitoring-install: ## Install/upgrade Prometheus, Grafana, Pushgateway, the operator dashboard and ServiceMonitor (CLOUD=hyperstack).
+	@test -f $(MONITORING_VALUES) || { echo "no $(MONITORING_VALUES) for CLOUD=$(CLOUD); on GKE the stack is Terraform-managed (example/infra/gcp/grafana.tf)"; exit 1; }
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null
+	helm repo update prometheus-community >/dev/null
+	@if [ -f $(MONITORING_SC) ]; then kubectl apply -f $(MONITORING_SC); fi
+	helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+		--namespace monitoring --create-namespace --timeout 10m --wait \
+		-f $(MONITORING_VALUES) --set grafana.adminPassword=$(GRAFANA_PASSWORD)
+	helm upgrade --install pushgateway prometheus-community/prometheus-pushgateway \
+		--namespace monitoring --wait -f config/monitoring/values-pushgateway.yaml
+	kubectl apply -k config/grafana
+	kubectl apply -f config/monitoring/servicemonitor.yaml
+	@echo "Grafana: make monitoring-grafana   (user admin / $(GRAFANA_PASSWORD))"
+
+.PHONY: monitoring-grafana
+monitoring-grafana: ## Port-forward Grafana to http://localhost:3000.
+	kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+
+.PHONY: monitoring-uninstall
+monitoring-uninstall: ## Remove the monitoring stack AND the Prometheus PVC (detaches the Retain volume — run before destroying the cluster).
+	-kubectl delete -f config/monitoring/servicemonitor.yaml --ignore-not-found
+	-kubectl delete -k config/grafana --ignore-not-found
+	-helm uninstall pushgateway --namespace monitoring
+	-helm uninstall monitoring --namespace monitoring
+	kubectl -n monitoring delete pvc --all --ignore-not-found
+	kubectl -n monitoring wait --for=delete pvc --all --timeout=180s || true
+	@echo "Retain volume is detached; delete it on the Hyperstack Volumes page when the data is no longer needed."
 
 ##@ Deployment
 

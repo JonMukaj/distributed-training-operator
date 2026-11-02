@@ -24,11 +24,24 @@ import (
 var _ backend.JobBackend = (*Backend)(nil)
 
 // Backend implements JobBackend for Kubeflow PyTorchJob.
-type Backend struct{}
+type Backend struct {
+	// nodePoolLabelKey is the node label that carries the node-pool / node-group
+	// name on the current cloud (GKE: cloud.google.com/gke-nodepool; Hyperstack:
+	// the --hyperstack-nodepool-label flag). Replica pods are pinned to the
+	// job's ephemeral pool with a nodeSelector on this key.
+	nodePoolLabelKey string
+}
 
-// New creates a PyTorch backend.
-func New() *Backend {
-	return &Backend{}
+// DefaultNodePoolLabelKey is used when New is given an empty key (GKE).
+const DefaultNodePoolLabelKey = "cloud.google.com/gke-nodepool"
+
+// New creates a PyTorch backend. nodePoolLabelKey should come from
+// cloud.Provider.NodePoolLabelKey(); an empty value falls back to the GKE label.
+func New(nodePoolLabelKey string) *Backend {
+	if nodePoolLabelKey == "" {
+		nodePoolLabelKey = DefaultNodePoolLabelKey
+	}
+	return &Backend{nodePoolLabelKey: nodePoolLabelKey}
 }
 
 // ---------------------------------------------------------------------------
@@ -69,7 +82,7 @@ func (b *Backend) GenerateManifest(job *trainingv1.DistributedTraining) (*unstru
 	envVars := buildEnvVars(job)
 	volumes, volumeMounts := buildVolumes(job)
 	resources := buildResources(job)
-	nodeSel, tolerations := buildNodeSelector(job)
+	nodeSel, tolerations := b.buildNodeSelector(job)
 
 	obj := &unstructured.Unstructured{
 		Object: map[string]any{
@@ -112,26 +125,69 @@ func (b *Backend) GetPhase(
 //
 // Returns PyTorchJob.status.startTime — the wall-clock moment Kubeflow's
 // training-operator considers all replica pods to have reached Running.
-// This excludes image pull and pod scheduling from the operator's
-// TrainingStartTime, which means `distributedtraining_training_seconds` ends up
-// measuring the same window as baseline_train.sh's `training_s`.
+// Returns the lastTransitionTime of the PyTorchJob's `Running` condition —
+// the moment Kubeflow saw all replica pods running — so that pod scheduling,
+// image pull and (on fresh GPU nodes) device-plugin start-up are excluded from
+// `training_seconds`.
 //
-// Returns a zero time (with nil error) if status.startTime is not yet
-// populated — the controller treats that as "retry later."
+// status.startTime is deliberately NOT used: Kubeflow sets it when the job
+// object is first reconciled, i.e. at creation, which on an ephemeral node
+// inflated a 173 s training loop to a 399 s "training time" (measured on
+// Hyperstack, 2026-11-02) and made the solver fit α≈1 to pure infrastructure
+// overhead.
+//
+// Returns a zero time (with nil error) while the Running condition is not yet
+// true — the controller treats that as "retry later."
 func (b *Backend) GetStartTime(
 	ctx context.Context,
 	c client.Client,
 	namespace, jobName string,
 ) (time.Time, error) {
-	return pytorchJobStatusTime(ctx, c, namespace, jobName, "startTime")
+	pj, err := getPyTorchJob(ctx, c, namespace, jobName)
+	if err != nil {
+		return time.Time{}, err
+	}
+	conditions, _, _ := unstructured.NestedSlice(pj.Object, "status", "conditions")
+	return runningSince(conditions)
+}
+
+// runningSince returns the lastTransitionTime of a true `Running` condition,
+// or zero if there is none. Pure function, unit-tested.
+func runningSince(conditions []any) (time.Time, error) {
+	for _, c := range conditions {
+		cmap, ok := c.(map[string]any)
+		if !ok || cmap["type"] != "Running" || cmap["status"] != "True" {
+			continue
+		}
+		str, _ := cmap["lastTransitionTime"].(string)
+		if str == "" {
+			return time.Time{}, nil
+		}
+		t, err := time.Parse(time.RFC3339, str)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("parsing Running condition lastTransitionTime %q: %w", str, err)
+		}
+		return t, nil
+	}
+	return time.Time{}, nil
+}
+
+func getPyTorchJob(ctx context.Context, c client.Client, namespace, jobName string) (*unstructured.Unstructured, error) {
+	pj := &unstructured.Unstructured{}
+	pj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group: "kubeflow.org", Version: "v1", Kind: "PyTorchJob",
+	})
+	if err := c.Get(ctx, types.NamespacedName{Namespace: namespace, Name: jobName}, pj); err != nil {
+		return nil, fmt.Errorf("fetching PyTorchJob %s: %w", jobName, err)
+	}
+	return pj, nil
 }
 
 // GetEndTime implements backend.JobBackend.
 //
 // Returns PyTorchJob.status.completionTime — the wall-clock moment Kubeflow's
-// training-operator marked the job complete. Used as the right endpoint of
-// `training_seconds` so the metric exactly matches baseline_train.sh's
-// PJ.status.startTime → completionTime window (no reconcile-lag inflation).
+// training-operator marked the job complete. Right endpoint of
+// `training_seconds` (left endpoint: GetStartTime, the Running condition).
 //
 // Returns a zero time (with nil error) if completionTime is not yet populated.
 func (b *Backend) GetEndTime(
@@ -149,12 +205,9 @@ func pytorchJobStatusTime(
 	c client.Client,
 	namespace, jobName, field string,
 ) (time.Time, error) {
-	pj := &unstructured.Unstructured{}
-	pj.SetGroupVersionKind(schema.GroupVersionKind{
-		Group: "kubeflow.org", Version: "v1", Kind: "PyTorchJob",
-	})
-	if err := c.Get(ctx, types.NamespacedName{Namespace: namespace, Name: jobName}, pj); err != nil {
-		return time.Time{}, fmt.Errorf("fetching PyTorchJob %s: %w", jobName, err)
+	pj, err := getPyTorchJob(ctx, c, namespace, jobName)
+	if err != nil {
+		return time.Time{}, err
 	}
 	str, found, err := unstructured.NestedString(pj.Object, "status", field)
 	if err != nil || !found || str == "" {
@@ -221,15 +274,18 @@ func (b *Backend) CollectResults(
 	if err != nil {
 		return nil, err
 	}
-	metrics, err := collectFromPVC(ctx, cs, job.Namespace, job.Spec.OutputPVCName)
+	// Keep the reader pod off the job's own node pool: the controller deletes
+	// that pool while we read, and a reader placed there loses its node mid-exec.
+	avoid := collect.AvoidNodes(b.nodePoolLabelKey, job.Spec.Hardware.NodePoolName)
+	metrics, err := collectFromPVC(ctx, cs, job.Namespace, job.Spec.OutputPVCName, avoid)
 	if err != nil {
 		return nil, fmt.Errorf("reading all_results.json from PVC %s: %w", job.Spec.OutputPVCName, err)
 	}
 	return &trainingv1.JobResults{Metrics: metrics}, nil
 }
 
-func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName string) (map[string]string, error) {
-	raw, err := collect.FromPVCFile(ctx, cs, namespace, pvcName, "checkpoints/all_results.json")
+func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName string, opts ...collect.ReaderOption) (map[string]string, error) {
+	raw, err := collect.FromPVCFile(ctx, cs, namespace, pvcName, "checkpoints/all_results.json", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +319,7 @@ func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pv
 
 	// Optional data-transfer breakdown. Absent file → skip (not every job is
 	// instrumented); the regular results above are still returned.
-	addTransferMetrics(ctx, cs, namespace, pvcName, metrics)
+	addTransferMetrics(ctx, cs, namespace, pvcName, metrics, opts...)
 
 	return metrics, nil
 }
@@ -271,9 +327,9 @@ func collectFromPVC(ctx context.Context, cs *kubernetes.Clientset, namespace, pv
 // addTransferMetrics reads transfer_profile.json from the PVC (if present) and
 // folds its fields into the metrics map. A missing or unparseable file is logged
 // and ignored so result collection never fails on its account.
-func addTransferMetrics(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName string, metrics map[string]string) {
+func addTransferMetrics(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName string, metrics map[string]string, opts ...collect.ReaderOption) {
 	log := logf.FromContext(ctx)
-	raw, err := collect.FromPVCFile(ctx, cs, namespace, pvcName, "checkpoints/transfer_profile.json")
+	raw, err := collect.FromPVCFile(ctx, cs, namespace, pvcName, "checkpoints/transfer_profile.json", opts...)
 	if err != nil {
 		log.Info("No transfer_profile.json found — skipping transfer metrics", "pvc", pvcName, "reason", err.Error())
 		return
@@ -584,7 +640,12 @@ func buildResources(job *trainingv1.DistributedTraining) map[string]any {
 	return map[string]any{}
 }
 
-func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
+// buildNodeSelector pins replica pods to the job's ephemeral node pool via the
+// cloud provider's pool label (the controller fills hardware.nodePoolName before
+// the manifest is generated) and tolerates the pool's taints. The reserved-pool
+// taint is GKE-specific; Hyperstack node groups carry no taint, so the
+// toleration is inert there.
+func (b *Backend) buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []any) {
 	poolName := job.Spec.Hardware.NodePoolName
 	if poolName == "" {
 		if hasGPUFromSpec(job.Spec.PytorchSpec, job.Spec.Hardware) {
@@ -593,7 +654,7 @@ func buildNodeSelector(job *trainingv1.DistributedTraining) (map[string]any, []a
 			poolName = "cpu-pool"
 		}
 	}
-	nodeSelector := map[string]any{"cloud.google.com/gke-nodepool": poolName}
+	nodeSelector := map[string]any{b.nodePoolLabelKey: poolName}
 	tolerations := []any{
 		map[string]any{"key": "reserved-pool", "operator": "Equal", "value": "true", "effect": "NoSchedule"},
 	}

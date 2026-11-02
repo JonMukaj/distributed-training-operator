@@ -7,8 +7,9 @@
 #   - HF model weights downloaded on run 1 are cached for run 2+
 #   - Checkpoints written by a failed run are available for resumeFromCheckpoint
 #
-# Apply:
+# Apply (GKE — its node image has an NFS client):
 #   kubectl apply -f config/samples/pvc.yaml
+# On Hyperstack use pvc-nfs-csi.yaml instead: the nodes have no mount.nfs helper.
 #
 # Then reference in any DistributedTraining:
 #   spec:

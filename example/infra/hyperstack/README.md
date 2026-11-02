@@ -29,11 +29,21 @@ export HYPERSTACK_API_KEY=your-api-key-here
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars: environment_name, keypair_name, cluster_name
 
-# 3. Deploy
+# 3. Deploy the cluster
 terraform init
-terraform plan
 terraform apply
+
+# 4. Kubeconfig for kubectl/helm (sensitive output, file is gitignored)
+terraform output -raw kubeconfig > kubeconfig.yaml
+export KUBECONFIG=$PWD/kubeconfig.yaml
 ```
+
+This module manages the cluster only. In-cluster components (CSI drivers, NFS, Kubeflow,
+the operator, Prometheus/Grafana via `make monitoring-install`) are installed with
+kubectl/helm from `operator/` — see the root README, Hyperstack section. Run
+`make monitoring-uninstall` and delete the NFS workload before `terraform destroy` so the
+CSI volumes are detached (NFS disk: deleted; Prometheus: retained) while the nodes still
+exist — a volume still attached when its VM disappears gets stuck RESERVED.
 
 ## Wiring the cluster to the operator
 
@@ -48,9 +58,11 @@ Use that value for the operator's `--hyperstack-cluster-id` flag in
 and create the API-key secret in the operator's namespace:
 
 ```sh
-kubectl create secret generic hyperstack-api \
-  --from-literal=api-key=$HYPERSTACK_API_KEY \
-  -n operator-system
+cd ../../../operator
+make hs-configure HYPERSTACK_CLUSTER_ID=$(terraform -chdir=../example/infra/hyperstack output -raw cluster_id)
+make hs-secret   # reads $HYPERSTACK_API_KEY, creates the Secret in distributed-training-system
 ```
 
-Then deploy the operator with `kubectl apply -k operator/config/overlays/hyperstack`.
+Then deploy the operator with `make hs-build-deploy IMG=<image:tag>` (or
+`kubectl apply -k config/overlays/hyperstack` to deploy the image already pinned in
+`config/manager/kustomization.yaml`). See the root README, Hyperstack Steps 4–6.

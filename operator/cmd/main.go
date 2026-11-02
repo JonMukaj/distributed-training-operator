@@ -198,8 +198,8 @@ func main() {
 	// Register all job backends. Adding a new backend means implementing
 	// backend.JobBackend and adding an entry here.
 	backends := map[trainingv1.BackendType]backend.JobBackend{
-		trainingv1.BackendPyTorch: pytorch.New(),
-		trainingv1.BackendSpark:   spark.New(),
+		trainingv1.BackendPyTorch: pytorch.New(provider.NodePoolLabelKey()),
+		trainingv1.BackendSpark:   spark.New(provider.NodePoolLabelKey()),
 	}
 	setupLog.Info("job backends registered", "backends", []string{"pytorch", "spark"})
 

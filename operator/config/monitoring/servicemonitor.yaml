@@ -1,0 +1,30 @@
+# Tells the kube-prometheus-stack Prometheus where to scrape the operator.
+# Targets the plain-HTTP metrics Service that the cloud overlays add
+# (config/prometheus-http, port 8080; the manager runs with
+# --metrics-bind-address=:8080 --metrics-secure=false). Lives in the monitoring
+# namespace and is applied by `make monitoring-install`, after the chart has
+# installed the ServiceMonitor CRD.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: distributed-training-operator
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      # Keep the operator's own `namespace` label (the CR's namespace) instead
+      # of the scrape target's namespace, so operator metrics and Pushgateway
+      # baselines share the same Grafana namespace dropdown.
+      honorLabels: true
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: operator
+      metrics: http
+  namespaceSelector:
+    matchNames:
+      - distributed-training-system

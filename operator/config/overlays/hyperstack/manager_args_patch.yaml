@@ -6,7 +6,7 @@
 #
 #   kubectl create secret generic hyperstack-api \
 #     --from-literal=api-key=YOUR_HYPERSTACK_API_KEY \
-#     -n operator-system
+#     -n distributed-training-system   # the manager's namespace (config/default)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,15 +23,16 @@ spec:
           - --metrics-bind-address=:8080
           - --metrics-secure=false
           - --cloud-provider=hyperstack
-          - --hyperstack-cluster-id=YOUR_CLUSTER_ID
+          - --hyperstack-cluster-id=2050
           - --hyperstack-api-url=https://infrahub-api.nexgencloud.com/v1
-          # The node label that carries the node-group name. Verify this against
-          # your cluster's `kubectl get nodes --show-labels` and override if needed.
-          - --hyperstack-nodepool-label=hyperstack.cloud/node-group
+          # The node label that carries the node-group name (verified on a live
+          # cluster: workers carry hyperstack.cloud/node-group-name=<group>).
+          # Re-check with `kubectl get nodes --show-labels` after platform upgrades.
+          - --hyperstack-nodepool-label=hyperstack.cloud/node-group-name
           # Hyperstack flavor names (see `List flavors` API) used when the CR does
           # not pin spec.hardware.machineType.
           - --default-cpu-machine-type=n1-cpu-small
-          - --default-gpu-machine-type=n1-cpu-small
+          - --default-gpu-machine-type=n3-L40x1
           - --machine-costs-configmap=machine-costs
           - --machine-costs-namespace=distributed-training-system
 

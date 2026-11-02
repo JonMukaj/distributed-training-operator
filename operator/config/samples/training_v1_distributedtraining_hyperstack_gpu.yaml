@@ -1,0 +1,205 @@
+# ---------------------------------------------------------------------------
+# GPU LLM fine-tuning — Hyperstack, ephemeral L40 node group (A100 as alternative)
+# Step-by-step run sequence: README → "Step 7 — Run the GPU fine-tuning sample"
+# in the Hyperstack section.
+#
+# GPU counterpart of Example 2 in training_v1_distributedtraining.yaml. Same
+# workload as the Helm chart used for the manual GPU runs (smol_llama-101M-GQA,
+# medical_meadow flashcards, LoRA, bf16). Image jmukaj/gpu-fine-tuner-hf:v2.1.0 is
+# built from script/gpu/Dockerfile (slim runtime base, ~4 GB) and carries the
+# instrumented finetune.py, so every run also writes transfer_profile.json
+# (v2.0.0: same script on a 12 GB devel base that fresh nodes failed to pull in
+# time; v1.0.0: the original script).
+#
+# Hyperstack specifics:
+#   * hardware.machineType is a Hyperstack FLAVOR name
+#     (https://docs.hyperstack.cloud/docs/hardware/flavors/), region CANADA-1:
+#       n3-L40x1  = 1x NVIDIA L40 48 GB,          28 vCPU,  58 GB RAM  (default below)
+#       n3-A100x1 = 1x NVIDIA A100 80 GB PCIe,    28 vCPU, 120 GB RAM  (commented alternative)
+#     The flavor bundles its GPU, so gpuType/gpuCount/diskSizeGb are ignored.
+#     Switching flavor: change machineType, keep the memory request within the
+#     node's RAM, and make sure the flavor has a price in the machine-costs
+#     ConfigMap if you use objective mode.
+#   * Node-group names are limited to 20 characters. The operator would derive
+#     "dj-<metadata.name>", which is too long here, so hardware.nodePoolName
+#     pins a short one. It must differ between CRs that may run concurrently.
+#   * Hyperstack clusters ship with the NVIDIA driver and device plugin; a
+#     pod that requests nvidia.com/gpu runs without extra setup.
+#   * Replica pods are pinned to the node group with a nodeSelector on the
+#     --hyperstack-nodepool-label flag's key. If that label is wrong for your
+#     cluster the pods stay Pending — see README Step 4 (node label).
+#
+# pytorchSpec.command is NOT set — the operator builds the torchrun invocation
+# from model/dataset/training/optimization (hardware.type=gpu → --no_cuda=False,
+# default --ddp_backend=nccl, nvidia.com/gpu toleration).
+#
+# The PVC is mounted at /mnt/output in every replica:
+#   /mnt/output/checkpoints        — --output_dir (all_results.json, transfer_profile.json)
+#   /mnt/output/hf-cache           — model/tokenizer cache (HF_HOME env below)
+#   /mnt/output/hf-cache/datasets  — tokenised dataset cache (dataset.cacheDirectory)
+#
+# Prerequisites (README Hyperstack section, Steps 1–6):
+#   1. Hyperstack CSI driver, NFS server, NFS CSI driver and the shared PVC (from operator/):
+#        kubectl apply -f ../example/infra/demo/nfs-hyperstack.yaml
+#        helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs -n kube-system
+#        kubectl apply -f config/samples/pvc-nfs-csi.yaml   # not pvc.yaml: nodes have no NFS client
+#   2. Kubeflow training-operator installed (PyTorchJob CRD).
+#   3. Operator deployed with config/overlays/hyperstack (cluster ID, API key).
+#   4. Hourly price of the flavor in the machine-costs ConfigMap — needed only
+#      for objective mode (see the bottom of this file).
+#   5. HF token secret — only for gated models (not needed for smol_llama):
+#        kubectl create secret generic hf-token-secret --from-literal=token=<hf_...>
+#      Never commit the token itself (the Helm values file carries it base64-encoded).
+#
+# Node counts: the CR below is a fixed-topology run (calibration). Run it once
+# with nodes: 1 and once with nodes: 2, then switch to the objective block at
+# the bottom to let the solver pick the node count from the two history entries.
+# ---------------------------------------------------------------------------
+# apiVersion: training.distributedtraining.io/v1
+# kind: DistributedTraining
+# metadata:
+#   name: distributedtraining-llm-gpu-1
+# spec:
+#   backend: pytorch
+#   hardware:
+#     type: gpu
+#     machineType: n3-L40x1        # Hyperstack flavor: 1x L40 48 GB per node
+#     # machineType: n3-A100x1     # alternative: 1x A100-80G-PCIe per node (raise memory below to 32Gi)
+#     nodePoolName: dj-gpu-cal-1   # ≤ 20 chars (Hyperstack limit); unique per concurrent CR
+#   topology:
+#     nodes: 1                     # calibration run 1; set 2 (and a new name/nodePoolName) for run 2
+#     processesPerNode: 1          # one torchrun process per GPU; the flavor has 1
+#   outputPVCName: distributed-training-output-pvc
+#   model:
+#     name: BEE-spoke-data/smol_llama-101M-GQA
+#     trainingScript: /workspace/scripts/finetune.py
+#     # hfTokenSecret:             # uncomment for gated models (e.g. meta-llama/Llama-3.2-1B)
+#     #   name: hf-token-secret
+#     #   key: token
+#   dataset:
+#     name: medalpaca/medical_meadow_medical_flashcards
+#     split: train
+#     promptWithInput: "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request."
+#     promptWithoutInput: "Below is an instruction that describes a task. Write a response that appropriately completes the request."
+#   training:
+#     batchSize: 4
+#     learningRate: "2e-5"
+#     epochs: 1
+#     maxSteps: -1
+#     gradAccumulationSteps: 1
+#     maxGradNorm: "1.0"
+#     validationSplit: "0.20"
+#     warmupSteps: 50
+#     loggingSteps: 10
+#     saveTotalLimit: 2
+#     saveStrategy: epoch
+#     overwriteOutputDir: true
+#     ddpBackend: nccl             # GPU default; the chart's gloo also works but is slower
+#     ddpFindUnusedParameters: false
+#   optimization:
+#     mixedPrecision: bf16
+#     bf16FullEval: true
+#     lora:
+#       enabled: true
+#       rank: 4
+#       alpha: 8
+#       dropout: "0.1"
+#       targetModules:
+#         - q_proj
+#         - v_proj
+#         - k_proj
+#         - o_proj
+#         - gate_proj
+#         - up_proj
+#         - down_proj
+#   pytorchSpec:
+#     image: jmukaj/gpu-fine-tuner-hf:v2.1.0
+#     resources:                   # n3-L40x1 node: 28 vCPU / 58 GB; leave headroom for system pods
+#       requests:
+#         cpu: "8"
+#         memory: "24Gi"
+#       limits:
+#         cpu: "8"
+#         memory: "24Gi"
+#         nvidia.com/gpu: "1"      # one GPU per node in this flavor
+#     env:
+#       - name: HF_HOME                # keep model weights on the PVC across runs
+#         value: /mnt/output/hf-cache
+#       - name: HF_HUB_DISABLE_XET
+#         value: "1"
+#       - name: NCCL_DEBUG
+#         value: WARN
+#       # NCCL_SOCKET_IFNAME is not pinned: the interface name on Hyperstack VMs
+#       # differs from GKE's eth0; NCCL autodetects. Set it only if multi-node
+#       # NCCL init fails (check `ip -br link` inside a pod).
+#       # LD_PRELOAD (tcmalloc/iomp) from the Intel CPU image is not needed here.
+---
+# ---------------------------------------------------------------------------
+# Objective mode — same workload, solver picks the node count
+#
+# Apply after the two calibration runs above have written history entries
+# (kubectl get distributedtraininghistories). Identical model/dataset/training
+# fields are required: they form the config hash that groups history.
+# ---------------------------------------------------------------------------
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  name: distributedtraining-llm-gpu-obj-3
+spec:
+  backend: pytorch
+  hardware:
+    type: gpu
+    machineType: n3-L40x1      # or n3-A100x1
+    nodePoolName: dj-gpu-obj-3
+  objective:
+    targetTime: "5m"
+    maxCost: "5"
+    maxNodes: 4
+  outputPVCName: distributed-training-output-pvc
+  model:
+    name: BEE-spoke-data/smol_llama-101M-GQA
+    trainingScript: /workspace/scripts/finetune.py
+  dataset:
+    name: medalpaca/medical_meadow_medical_flashcards
+    split: train
+    promptWithInput: "Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request."
+    promptWithoutInput: "Below is an instruction that describes a task. Write a response that appropriately completes the request."
+  training:
+    batchSize: 4
+    learningRate: "2e-5"
+    epochs: 1
+    maxSteps: -1
+    gradAccumulationSteps: 1
+    maxGradNorm: "1.0"
+    validationSplit: "0.20"
+    warmupSteps: 50
+    loggingSteps: 10
+    saveTotalLimit: 2
+    saveStrategy: epoch
+    overwriteOutputDir: true
+    ddpBackend: nccl
+    ddpFindUnusedParameters: false
+  optimization:
+    mixedPrecision: bf16
+    bf16FullEval: true
+    lora:
+      enabled: true
+      rank: 4
+      alpha: 8
+      dropout: "0.1"
+      targetModules: [q_proj, v_proj, k_proj, o_proj, gate_proj, up_proj, down_proj]
+  pytorchSpec:
+    image: jmukaj/gpu-fine-tuner-hf:v2.1.0
+    resources:
+      requests: {cpu: "8", memory: "24Gi"}
+      limits: {cpu: "8", memory: "24Gi", nvidia.com/gpu: "1"}
+    env:
+      - {name: HF_HOME, value: /mnt/output/hf-cache}
+      - {name: HF_HUB_DISABLE_XET, value: "1"}
+---
+# ---------------------------------------------------------------------------
+# machine-costs ConfigMap (objective mode only): config/samples/machine-costs-configmap.yaml
+# carries both flavors at their console on-demand prices (n3-L40x1 $1.00/h,
+# n3-A100x1 $1.35/h). `make hs-build-deploy` / `hs-reset-cr` apply the ConfigMap;
+# after editing it re-apply with
+#   kubectl apply -f config/samples/machine-costs-configmap.yaml

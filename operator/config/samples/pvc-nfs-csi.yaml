@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------------------
+# Shared output storage — CSI variant for clusters whose nodes have NO NFS
+# client (Hyperstack's Ubuntu node images). Apply once per cluster, instead of
+# pvc.yaml, after installing the NFS CSI driver:
+#
+#   helm repo add csi-driver-nfs https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/charts
+#   helm repo update
+#   helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs --namespace kube-system
+#   kubectl apply -f config/samples/pvc-nfs-csi.yaml
+#
+# Why: the in-tree `nfs:` volume in pvc.yaml makes the kubelet run `mount -t nfs`
+# on the host, which needs /sbin/mount.nfs (package nfs-common) and host DNS that
+# resolves *.svc.cluster.local. Hyperstack nodes have neither, and the operator
+# creates fresh nodes per job, so installing packages by hand does not stick.
+# The NFS CSI node plugin performs the mount inside its own pod (it ships the
+# NFS client and uses cluster DNS) and propagates it to the host. GKE's node
+# image has an NFS client, so pvc.yaml keeps working there.
+#
+# Same names as pvc.yaml, so every DistributedTraining keeps
+#   spec.outputPVCName: distributed-training-output-pvc
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: distributed-training-output-pv
+spec:
+  capacity:
+    storage: 50Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""            # static binding; keep the cluster's default class out of it
+  claimRef:
+    name: distributed-training-output-pvc
+    namespace: default
+  mountOptions:
+    - nfsvers=4.1
+  csi:
+    driver: nfs.csi.k8s.io
+    # Must be unique per PV on the cluster: server + share + a suffix.
+    volumeHandle: nfs-server.default.svc.cluster.local/distributed-training-output
+    volumeAttributes:
+      server: nfs-server.default.svc.cluster.local
+      share: /
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: distributed-training-output-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 50Gi
+  volumeName: distributed-training-output-pv

@@ -22,12 +22,42 @@ const (
 	readerPodInterval = 3 * time.Second
 )
 
-// FromPVCFile reads a file from a PVC by creating a short-lived reader pod,
-// execing cat on the target path, then deleting the pod.
-// Returns the raw file bytes on success.
-func FromPVCFile(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName, filePath string) ([]byte, error) {
-	podName := fmt.Sprintf("pvc-reader-%d", time.Now().UnixNano()%1_000_000)
+// ReaderOption customises the short-lived reader pod.
+type ReaderOption func(*corev1.Pod)
 
+// AvoidNodes keeps the reader pod off every node carrying labelKey=value.
+//
+// The controller deletes a job's ephemeral node pool in parallel with result
+// collection. Without this constraint the scheduler happily places the reader
+// pod on one of those nodes — it is Ready and idle — and the exec into it
+// times out when the VM disappears ("error dialing backend ... i/o timeout"),
+// so the job ends with no metrics and no history entry. Expressed as a
+// required node anti-affinity on the provider's pool label, which exists on
+// every cloud the operator supports.
+func AvoidNodes(labelKey, value string) ReaderOption {
+	return func(pod *corev1.Pod) {
+		if labelKey == "" || value == "" {
+			return
+		}
+		pod.Spec.Affinity = &corev1.Affinity{
+			NodeAffinity: &corev1.NodeAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{{
+						MatchExpressions: []corev1.NodeSelectorRequirement{{
+							Key:      labelKey,
+							Operator: corev1.NodeSelectorOpNotIn,
+							Values:   []string{value},
+						}},
+					}},
+				},
+			},
+		}
+	}
+}
+
+// newReaderPod builds the reader pod spec. Kept separate so placement rules
+// can be unit-tested without a cluster.
+func newReaderPod(namespace, podName, pvcName string, opts ...ReaderOption) *corev1.Pod {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -56,6 +86,18 @@ func FromPVCFile(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcNa
 			}},
 		},
 	}
+	for _, opt := range opts {
+		opt(pod)
+	}
+	return pod
+}
+
+// FromPVCFile reads a file from a PVC by creating a short-lived reader pod,
+// execing cat on the target path, then deleting the pod.
+// Returns the raw file bytes on success.
+func FromPVCFile(ctx context.Context, cs *kubernetes.Clientset, namespace, pvcName, filePath string, opts ...ReaderOption) ([]byte, error) {
+	podName := fmt.Sprintf("pvc-reader-%d", time.Now().UnixNano()%1_000_000)
+	pod := newReaderPod(namespace, podName, pvcName, opts...)
 
 	if _, err := cs.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 		return nil, fmt.Errorf("creating reader pod: %w", err)
