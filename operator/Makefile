@@ -163,6 +163,17 @@ SAMPLE_CR      ?= config/samples/training_v1_distributedtraining.yaml
 endif
 ADC_CREDS_FILE ?= $(HOME)/.config/gcloud/application_default_credentials.json
 
+# kubectl apply downloads the API server's OpenAPI schema for client-side
+# validation first. With Kubeflow + Prometheus Operator + CRDs installed that
+# document is large, and a slow control plane (seen on Hyperstack) makes the
+# download time out ("failed to download openapi ... Client.Timeout"). Retry,
+# and on the third attempt skip only the client-side pre-check — the API server
+# still validates every object against its schema.
+define kubectl_apply_k
+	kubectl apply -k $(1) || { echo "apply failed, retrying in 10s..."; sleep 10; kubectl apply -k $(1); } \
+		|| { echo "retrying without client-side OpenAPI validation (server-side validation still applies)"; kubectl apply -k $(1) --validate=false; }
+endef
+
 .PHONY: cloud-check
 cloud-check: ## Fail if $(OVERLAY) still contains YOUR_* placeholders (cluster ID, project, ...).
 	@test -d $(OVERLAY) || { echo "unknown CLOUD=$(CLOUD): $(OVERLAY) not found"; exit 1; }
@@ -185,13 +196,13 @@ endif
 .PHONY: cloud-build-deploy
 cloud-build-deploy: cloud-check docker-build docker-push ## Build + push $(IMG), point manifests at it, apply $(OVERLAY) and the machine-costs ConfigMap.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${IMG}
-	kubectl apply -k $(OVERLAY)
+	$(call kubectl_apply_k,$(OVERLAY))
 	kubectl apply -f config/samples/machine-costs-configmap.yaml
 	kubectl rollout status -n $(OPERATOR_NS) deploy/$(MANAGER_DEPLOY) --timeout=180s
 
 .PHONY: cloud-apply-config
 cloud-apply-config: cloud-check cloud-init ## Re-apply $(OVERLAY) without rebuilding, wait for the controller, then reset the sample CR.
-	kubectl apply -k $(OVERLAY)
+	$(call kubectl_apply_k,$(OVERLAY))
 	kubectl wait --for=condition=Available deployment/$(MANAGER_DEPLOY) -n $(OPERATOR_NS) --timeout=120s
 	$(MAKE) cloud-reset-cr CLOUD=$(CLOUD)
 

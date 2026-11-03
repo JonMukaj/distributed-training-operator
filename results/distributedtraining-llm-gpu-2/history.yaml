@@ -1,0 +1,28 @@
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTrainingHistory
+metadata:
+  creationTimestamp: "2026-11-03T21:10:47Z"
+  generateName: djh-distributedtraining-llm-gpu-2-
+  generation: 1
+  labels:
+    config-hash: 742aa04b1fbe396dfc76fd11e9037d354042c7142d1a007fe50ae2aed1bb9b3
+  name: djh-distributedtraining-llm-gpu-2-zwkfz
+  namespace: default
+  resourceVersion: "24155"
+  uid: 851a470f-e0e8-414b-bcdb-748a91449f6b
+spec:
+  allReduceBandwidthMBs: "2808.2163"
+  allReduceFraction: "0.004173"
+  backend: pytorch
+  computeFraction: "0.943124"
+  configHash: 742aa04b1fbe396dfc76fd11e9037d354042c7142d1a007fe50ae2aed1bb9b3
+  dataloadFraction: "0.056876"
+  gradSizeBytes: 368640
+  machineType: n3-L40x1
+  nfsReadBandwidthMBs: "7.4368"
+  nodes: 2
+  provisioningSeconds: "484"
+  throughput: 125759259260n
+  totalAllReduceBytes: 1250058240
+  totalWork: "27164"
+  trainingSeconds: "216"

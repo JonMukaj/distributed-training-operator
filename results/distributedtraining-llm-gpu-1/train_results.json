@@ -1,0 +1,16 @@
+{
+    "allreduce_bandwidth_MBs": 0.0,
+    "allreduce_fraction": 0.0,
+    "compute_fraction": 0.9411779850022127,
+    "dataload_fraction": 0.05882201499778726,
+    "epoch": 1.0,
+    "grad_size_bytes": 368640,
+    "nfs_read_bandwidth_MBs": 4.296467805501475,
+    "nfs_read_bytes": 45056000,
+    "total_allreduce_bytes": 0,
+    "train_loss": 1.5537499584517622,
+    "train_runtime": 179.5252,
+    "train_samples": 27164,
+    "train_samples_per_second": 151.31,
+    "train_steps_per_second": 37.828
+}

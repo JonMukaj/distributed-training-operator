@@ -30,6 +30,16 @@ const requeueAfter = 20 * time.Second
 // the nodes bill.
 const provisioningTimeout = 30 * time.Minute
 
+// nodeCleanupTimeout bounds how long the operator keeps retrying the removal of
+// a deleted pool's Node objects while they still report Ready (kubelet
+// heartbeat outliving the VM by ~40 s). Beyond it the nodes are presumed to be
+// someone else's and left alone.
+const nodeCleanupTimeout = 10 * time.Minute
+
+// nodeCleanupRequeue is the retry interval while waiting for the kubelet
+// heartbeat of deleted VMs to expire.
+const nodeCleanupRequeue = 30 * time.Second
+
 // ---------------------------------------------------------------------------
 // Phase: Pending
 // ---------------------------------------------------------------------------
@@ -257,18 +267,23 @@ func (r *DistributedTrainingReconciler) reconcileProvisioning(
 //
 // Only nodes that are not Ready are deleted, so a live node that merely shares
 // the label (e.g. a user-managed pool named like an ephemeral one) is never
-// removed. Errors are logged, not returned: cleanup must never block teardown.
-func (r *DistributedTrainingReconciler) deleteNodesInPool(ctx context.Context, poolName string) {
+// removed. Right after the cloud confirms the pool gone the kubelets are often
+// STILL heartbeating (the VM dies a little later and Ready flips to Unknown
+// only after the node-monitor grace period, ~40 s), so the number of Ready
+// nodes skipped is returned and the callers retry via finishNodeCleanup.
+// Errors are logged, not returned: cleanup must never block teardown.
+func (r *DistributedTrainingReconciler) deleteNodesInPool(ctx context.Context, poolName string) (remainingReady int) {
 	logger := log.FromContext(ctx)
 	nodeList := &corev1.NodeList{}
 	if err := r.List(ctx, nodeList, client.MatchingLabels{r.Cloud.NodePoolLabelKey(): poolName}); err != nil {
 		logger.Error(err, "listing nodes for stale-node cleanup", "pool", poolName)
-		return
+		return 0
 	}
 	for i := range nodeList.Items {
 		node := &nodeList.Items[i]
 		if nodeIsReady(node) {
-			logger.Info("stale-node cleanup: node still Ready, leaving it", "node", node.Name, "pool", poolName)
+			logger.Info("stale-node cleanup: node still Ready (kubelet heartbeat not yet expired), will retry", "node", node.Name, "pool", poolName)
+			remainingReady++
 			continue
 		}
 		if err := r.Delete(ctx, node); err != nil && !apierrors.IsNotFound(err) {
@@ -277,6 +292,34 @@ func (r *DistributedTrainingReconciler) deleteNodesInPool(ctx context.Context, p
 		}
 		logger.Info("deleted stale node object left behind by the cloud", "node", node.Name, "pool", poolName)
 	}
+	return remainingReady
+}
+
+// finishNodeCleanup removes the pool's leftover Node objects, returning true
+// when none that still report Ready remain, or when nodeCleanupTimeout has
+// passed since the first attempt (then the survivors are presumed to be live
+// nodes that merely share the label, and are left alone). Returns false when
+// the caller should requeue after nodeCleanupRequeue and try again.
+func (r *DistributedTrainingReconciler) finishNodeCleanup(ctx context.Context, job *trainingv1.DistributedTraining, poolName string) bool {
+	logger := log.FromContext(ctx)
+	if r.deleteNodesInPool(ctx, poolName) == 0 {
+		return true
+	}
+	if job.Status.NodeCleanupStartedAt == nil {
+		now := metav1.Now()
+		patch := client.MergeFrom(job.DeepCopy())
+		job.Status.NodeCleanupStartedAt = &now
+		if err := r.Status().Patch(ctx, job, patch); err != nil {
+			logger.Error(err, "recording node cleanup start")
+		}
+		return false
+	}
+	if time.Since(job.Status.NodeCleanupStartedAt.Time) > nodeCleanupTimeout {
+		logger.Info("stale-node cleanup: nodes still Ready after timeout — leaving them (not ours?)",
+			"pool", poolName, "timeout", nodeCleanupTimeout)
+		return true
+	}
+	return false
 }
 
 func nodeIsReady(node *corev1.Node) bool {
@@ -710,7 +753,11 @@ func (r *DistributedTrainingReconciler) reconcileSucceeded(
 	logger.Info("node pool deletion confirmed", "pool", r.nodePoolName(job))
 
 	// The cloud no longer has the pool; drop the Node objects it may have left.
-	r.deleteNodesInPool(ctx, r.nodePoolName(job))
+	// Their kubelets may still heartbeat for a while — retry until they are
+	// NotReady (GKEOperationID stays set so we come back here).
+	if !r.finishNodeCleanup(ctx, job, r.nodePoolName(job)) {
+		return ctrl.Result{RequeueAfter: nodeCleanupRequeue}, nil
+	}
 
 	patch := client.MergeFrom(job.DeepCopy())
 	job.Status.GKEOperationID = ""

@@ -612,6 +612,22 @@ type DistributedTrainingStatus struct {
 	// +optional
 	GKEOperationID string `json:"gkeOperationID,omitempty"`
 
+	// TeardownOperationID is the cloud operation that deletes the node pool
+	// when the CR itself is being deleted. Kept separate from GKEOperationID,
+	// which during Provisioning holds the CREATE operation: polling that one as
+	// if it were a deletion removed the finalizer without ever deleting the
+	// pool (leaked node group, 2026-11-03).
+	// +optional
+	TeardownOperationID string `json:"teardownOperationID,omitempty"`
+
+	// NodeCleanupStartedAt marks when the operator first tried to remove the
+	// pool's leftover Node objects after the cloud confirmed the pool deleted.
+	// The kubelet keeps heartbeating for ~40 s after the API reports the group
+	// gone, so a Ready node at that moment is skipped and retried until it turns
+	// NotReady; this timestamp bounds the retry.
+	// +optional
+	NodeCleanupStartedAt *metav1.Time `json:"nodeCleanupStartedAt,omitempty"`
+
 	// Conditions provides machine-readable status conditions.
 	// +optional
 	// +listType=map

@@ -49,7 +49,8 @@ var _ = Describe("deleteNodesInPool", func() {
 		makeNode(ctx, "other-pool-0", "dj-other", corev1.ConditionFalse)
 
 		r := &DistributedTrainingReconciler{Client: k8sClient, Scheme: k8sClient.Scheme(), Cloud: &stubCloud{label: poolLabelKey}}
-		r.deleteNodesInPool(ctx, "dj-gone")
+		remaining := r.deleteNodesInPool(ctx, "dj-gone")
+		Expect(remaining).To(Equal(1), "the Ready node must be reported as remaining so callers retry")
 
 		var n corev1.Node
 		for _, name := range []string{"stale-gone-0", "stale-gone-1"} {
@@ -60,8 +61,8 @@ var _ = Describe("deleteNodesInPool", func() {
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, &n)).To(Succeed(), "%s must survive", name)
 		}
 
-		// Idempotent: a second pass finds nothing to do and does not error.
-		r.deleteNodesInPool(ctx, "dj-gone")
+		// Idempotent: a second pass finds nothing new to delete and does not error.
+		Expect(r.deleteNodesInPool(ctx, "dj-gone")).To(Equal(1))
 
 		for _, name := range []string{"live-gone-2", "other-pool-0"} {
 			Expect(k8sClient.Delete(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}})).To(Succeed())

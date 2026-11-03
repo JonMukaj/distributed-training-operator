@@ -802,6 +802,15 @@ spec:
                 description: Message is a human-readable description of the current
                   state or last error.
                 type: string
+              nodeCleanupStartedAt:
+                description: |-
+                  NodeCleanupStartedAt marks when the operator first tried to remove the
+                  pool's leftover Node objects after the cloud confirmed the pool deleted.
+                  The kubelet keeps heartbeating for ~40 s after the API reports the group
+                  gone, so a Ready node at that moment is skipped and retried until it turns
+                  NotReady; this timestamp bounds the retry.
+                format: date-time
+                type: string
               nodePoolSize:
                 description: NodePoolSize is the number of nodes currently provisioned.
                 format: int32
@@ -902,6 +911,14 @@ spec:
                 description: StartTime records when the controller first processed
                   the job.
                 format: date-time
+                type: string
+              teardownOperationID:
+                description: |-
+                  TeardownOperationID is the cloud operation that deletes the node pool
+                  when the CR itself is being deleted. Kept separate from GKEOperationID,
+                  which during Provisioning holds the CREATE operation: polling that one as
+                  if it were a deletion removed the finalizer without ever deleting the
+                  pool (leaked node group, 2026-11-03).
                 type: string
               trainingStartTime:
                 description: |-

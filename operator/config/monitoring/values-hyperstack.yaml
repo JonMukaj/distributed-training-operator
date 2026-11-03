@@ -11,7 +11,15 @@
 #     the volume survives PVC deletion; delete the PVC BEFORE destroying the
 #     cluster or the volume gets stuck RESERVED (make monitoring-uninstall does).
 #   * Thesis runs are sparse: keep 90 days.
+#   * Hyperstack node images already run a node_exporter on the host at :9100
+#     (platform monitoring), and the chart's node-exporter uses hostNetwork, so
+#     ours crash-loops with "bind: address already in use". Node-level host
+#     metrics are not needed for the thesis — the operator's own metrics are —
+#     so the chart's node-exporter is simply not deployed.
 alertmanager:
+  enabled: false
+
+nodeExporter:
   enabled: false
 
 prometheusOperator:
@@ -35,8 +43,7 @@ grafana:
 prometheus:
   prometheusSpec:
     nodeSelector: *base
-    # Pick up every ServiceMonitor/PodMonitor in the cluster, not only the
-    # chart's own — the operator's ServiceMonitor lives in config/monitoring.
+    # Pick up every ServiceMonitor/PodMonitor in the cluster, not only the chart's own — the operator's ServiceMonitor lives in config/monitoring.
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
     enableAdminAPI: true

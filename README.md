@@ -320,9 +320,14 @@ Notes and differences from GKE:
 - Hyperstack does not remove the Kubernetes `Node` objects of a deleted node group (they
   linger as `NotReady,SchedulingDisabled`; GKE's cloud controller does this for you). The
   operator therefore deletes the pool's non-Ready Node objects itself once the cloud has
-  confirmed the pool is gone — after a successful run and when a CR is deleted. Deleting
+  confirmed the pool is gone — after a successful run and when a CR is deleted. The
+  kubelets keep heartbeating for ~40 s after the API reports the group deleted, so a node
+  that is still `Ready` at that moment is retried every 30 s (for up to 10 min) rather than
+  deleted or forgotten; the CR's status shows `nodeCleanupStartedAt` while this runs. Deleting
   a CR consequently keeps its finalizer until the node group is confirmed deleted
-  (`kubectl delete dj … ` returns when the pool is gone).
+  (`kubectl delete dj … ` returns when the pool is gone). Deleting a CR **while its pool
+  is still being created** waits for the create to finish first — clouds refuse to delete
+  a pool mid-creation — then deletes it; expect a few minutes before the CR disappears.
 - Result collection runs in parallel with node-group deletion. The reader pod that cats
   `all_results.json` off the PVC carries a node anti-affinity on the pool label so it is
   never scheduled onto the node being torn down; Hyperstack deletes VMs fast enough that
@@ -576,10 +581,7 @@ make gke-rebuild IMG=jmukaj/distributed-training-operator:<tag>
 
 ## Development and Deployment on Hyperstack
 
-This section covers the operator development workflow on a
-[Hyperstack](https://www.hyperstack.cloud/) (NexGen Cloud) managed Kubernetes cluster.
-The operator manages Hyperstack **node groups** (instead of GKE node pools) via its
-`hyperstack` cloud provider.
+This section covers the operator development workflow on a [Hyperstack](https://www.hyperstack.cloud/) (NexGen Cloud) managed Kubernetes cluster. The operator manages Hyperstack **node groups** via its `hyperstack` cloud provider.
 
 > **Working directory.** Steps 1–2 run from `example/infra/hyperstack/` (Terraform).
 > From Step 3 on, every command runs from `operator/`, where the Makefile lives; paths
@@ -590,7 +592,7 @@ The operator manages Hyperstack **node groups** (instead of GKE node pools) via 
 - **Tooling:** `go` v1.25.3+, `docker` 17.03+, `kubectl` v1.11.3+, `helm` 3+,
   `terraform` v1.0+, and `curl` + `jq` (to fetch the cluster kubeconfig).
 - **Hyperstack account** with an [API key](https://console.hyperstack.cloud/api-keys).
-  The same key is used by the operator, the CSI driver, and Terraform — export it once:
+  The same key is used by the operator, the CSI driver, and Terraform, so export it once:
 
   ```sh
   export HYPERSTACK_API_KEY=<your-api-key>
@@ -660,9 +662,7 @@ cd ../../../operator                 # all remaining steps run from operator/
 helm repo add nexgencloud https://nexgencloud.github.io/csi-hyperstack
 helm repo update
 helm install csi-hyperstack nexgencloud/csi-hyperstack --namespace kube-system --set hyperstack.apiKey=$HYPERSTACK_API_KEY
-# Wait until the node plugin has registered on every node; applying the NFS server
-# before that fails its first attach with "CSINode ... does not contain driver
-# hyperstack.csi.nexgencloud.com" (it would retry and recover, but the wait avoids the noise).
+# Wait until the node plugin has registered on every node; applying the NFS server before that fails its first attach with "CSINode ... does not contain driver hyperstack.csi.nexgencloud.com" (it would retry and recover, but the wait avoids the noise).
 kubectl rollout status -n kube-system ds/csi-hyperstack-node --timeout=180s
 kubectl get csinode -o custom-columns='NODE:.metadata.name,DRIVERS:.spec.drivers[*].name'   # expect hyperstack.csi.nexgencloud.com on the workers
 ```
@@ -709,12 +709,7 @@ make monitoring-install CLOUD=hyperstack GRAFANA_PASSWORD=<password>   # default
 kubectl -n monitoring get pods
 ```
 
-This applies the `prometheus-retain` StorageClass, installs kube-prometheus-stack and the
-Pushgateway into `monitoring` with `config/monitoring/values-hyperstack.yaml`, publishes
-the operator dashboard (`kubectl apply -k config/grafana`) and creates the ServiceMonitor
-(`config/monitoring/servicemonitor.yaml`) that scrapes the operator's plain-HTTP metrics
-Service on port 8080 — that Service is part of the Hyperstack overlay
-(`config/prometheus-http`), so it arrives with the operator in Step 5.
+This applies the `prometheus-retain` StorageClass, installs kube-prometheus-stack and the Pushgateway into `monitoring` with `config/monitoring/values-hyperstack.yaml`, publishes the operator dashboard (`kubectl apply -k config/grafana`) and creates the ServiceMonitor (`config/monitoring/servicemonitor.yaml`) that scrapes the operator's plain-HTTP metrics Service on port 8080 — that Service is part of the Hyperstack overlay (`config/prometheus-http`), so it arrives with the operator in Step 5.
 
 Design points, all in `config/monitoring/`:
 
@@ -749,9 +744,7 @@ make hs-init
 `distributed-training-system` and the `hyperstack-api` Secret in it.
 
 The node label the operator uses to find a node group's nodes is the platform label
-`hyperstack.cloud/node-group-name`, which Hyperstack puts on every worker. It is the
-built-in default, so nothing to configure. Should a platform upgrade ever rename it,
-find the new key and pass it once as `HYPERSTACK_NODE_LABEL=<key>`:
+`hyperstack.cloud/node-group-name`, which Hyperstack puts on every worker. It is the built-in default, so nothing to configure. Should a platform upgrade ever rename it, find the new key and pass it once as `HYPERSTACK_NODE_LABEL=<key>`:
 
 ```sh
 # list a worker's hyperstack.cloud/* labels; the key whose value is the group name
@@ -783,15 +776,12 @@ make manifests generate
 # Install CRDs
 make install
 
-# Build + push the controller image, point the manifests at it, deploy the Hyperstack
-# overlay and the machine-costs ConfigMap, wait for the rollout
+# Build + push the controller image, point the manifests at it, deploy the Hyperstack overlay and the machine-costs ConfigMap, wait for the rollout
 make hs-build-deploy IMG=jmukaj/distributed-training-operator:<tag>
 ```
 
 `hs-build-deploy` refuses to run while the overlay still has `YOUR_*` placeholders
-(`make cloud-check CLOUD=hyperstack` runs the same test). To change only overlay flags
-without rebuilding, use `make hs-apply-config`; note it also resets the sample CR, which on
-Hyperstack is the paid GPU sample.
+(`make cloud-check CLOUD=hyperstack` runs the same test). To change only overlay flags without rebuilding, use `make hs-apply-config`; note it also resets the sample CR, which on Hyperstack is the paid GPU sample.
 
 > **Local dev loop:** to iterate without building an image, run the controller locally
 > against the cluster (uses your current kubeconfig). `make run` takes no flags, so pass
@@ -851,8 +841,7 @@ config/samples/` never starts a GPU job by accident.
    --from-literal=token=<hf_...>` and uncomment `model.hfTokenSecret`. Never commit
    the token.
 
-NVIDIA drivers and the device plugin are preinstalled on Hyperstack clusters; nothing
-to apply. Hyperstack flavors bundle their GPU, so `hardware.gpuType`/`gpuCount` are
+NVIDIA drivers and the device plugin are preinstalled on Hyperstack clusters; nothing to apply. Hyperstack flavors bundle their GPU, so `hardware.gpuType`/`gpuCount` are
 ignored and the sample pins the GPU with the `nvidia.com/gpu: "1"` limit.
 
 **Run sequence** — the solver needs two node counts in history before it can fit α:
@@ -892,7 +881,7 @@ NFS server — and **every job overwrites them**, since all jobs share that outp
 Archive each run before starting the next:
 
 ```sh
-make hs-archive-results CR=distributedtraining-llm-gpu-3           # RUN=<dir name> defaults to the CR name
+make hs-archive-results CR=distributedtraining-llm-gpu-<>           # RUN=<dir name> defaults to the CR name
 ```
 
 This copies the JSON files to `/exports/results/<RUN>/` on the PVC (outside the path the next
@@ -919,6 +908,44 @@ torn down by the operator):
 ```sh
 kubectl delete dj distributedtraining-llm-gpu-1
 ```
+
+---
+
+### Remediation — a node group the operator no longer tracks
+
+Symptom: the `DistributedTraining` CR is gone but the Hyperstack console still lists
+`…-dj-<pool>-<n>` nodes (ACTIVE, role Worker) in a node group named after the pool, and
+`kubectl get nodes` does not show them. The group keeps billing. Causes seen so far: a CR
+deleted during Provisioning with an operator older than v3.3.0 (the finalizer was removed
+without deleting the pool), or any crash between pool creation and the status write.
+
+Always remove the **node group**, never its nodes one by one: Hyperstack refuses to delete
+the last node of a group (*"Cannot delete all worker nodes. At least one node group and
+node must remain"*), and an empty ghost group would collide with the next CR that reuses
+the pool name.
+
+1. Console: open the cluster → **Node groups** tab → delete the group (e.g. `dj-gpu-obj-3`).
+2. API, if the tab offers no delete — the same call the operator makes. Find the group ID
+   from the nodes list, then delete the group:
+
+   ```sh
+   curl -s https://infrahub-api.nexgencloud.com/v1/core/clusters/<cluster_id>/nodes \
+     -H "api_key: $HYPERSTACK_API_KEY" \
+     | jq '.nodes[] | select(.node_group_name=="dj-gpu-obj-3") | {id, node_group_id, status}'
+
+   curl -s -X DELETE https://infrahub-api.nexgencloud.com/v1/core/clusters/<cluster_id>/node-groups/<node_group_id> \
+     -H "api_key: $HYPERSTACK_API_KEY"
+   ```
+
+   (The operator's logs also carry the ID: the create operation is logged as
+   `create:<node_group_id>:<count>`.)
+3. Remove any Node objects Kubernetes still has for it (they show `NotReady`):
+   `kubectl delete node -l hyperstack.cloud/node-group-name=<pool>`.
+4. Check the [Volumes page](https://console.hyperstack.cloud/volumes) for anything that was
+   attached to those VMs.
+
+With operator ≥ v3.3.0 this should not recur: deleting a CR in any phase waits for the
+cloud to confirm the pool is gone before the finalizer is removed.
 
 ---
 

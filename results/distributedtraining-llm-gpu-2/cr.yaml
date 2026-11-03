@@ -1,0 +1,118 @@
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"training.distributedtraining.io/v1","kind":"DistributedTraining","metadata":{"annotations":{},"name":"distributedtraining-llm-gpu-2","namespace":"default"},"spec":{"backend":"pytorch","dataset":{"name":"medalpaca/medical_meadow_medical_flashcards","promptWithInput":"Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.","promptWithoutInput":"Below is an instruction that describes a task. Write a response that appropriately completes the request.","split":"train"},"hardware":{"machineType":"n3-L40x1","nodePoolName":"dj-gpu-cal-2","type":"gpu"},"model":{"name":"BEE-spoke-data/smol_llama-101M-GQA","trainingScript":"/workspace/scripts/finetune.py"},"optimization":{"bf16FullEval":true,"lora":{"alpha":8,"dropout":"0.1","enabled":true,"rank":4,"targetModules":["q_proj","v_proj","k_proj","o_proj","gate_proj","up_proj","down_proj"]},"mixedPrecision":"bf16"},"outputPVCName":"distributed-training-output-pvc","pytorchSpec":{"env":[{"name":"HF_HOME","value":"/mnt/output/hf-cache"},{"name":"HF_HUB_DISABLE_XET","value":"1"},{"name":"NCCL_DEBUG","value":"WARN"}],"image":"jmukaj/gpu-fine-tuner-hf:v2.1.0","resources":{"limits":{"cpu":"8","memory":"24Gi","nvidia.com/gpu":"1"},"requests":{"cpu":"8","memory":"24Gi"}}},"topology":{"nodes":2,"processesPerNode":1},"training":{"batchSize":4,"ddpBackend":"nccl","ddpFindUnusedParameters":false,"epochs":1,"gradAccumulationSteps":1,"learningRate":"2e-5","loggingSteps":10,"maxGradNorm":"1.0","maxSteps":-1,"overwriteOutputDir":true,"saveStrategy":"epoch","saveTotalLimit":2,"validationSplit":"0.20","warmupSteps":50}}}
+  creationTimestamp: "2026-11-03T20:56:36Z"
+  finalizers:
+  - training.distributedtraining.io/cleanup
+  generation: 1
+  name: distributedtraining-llm-gpu-2
+  namespace: default
+  resourceVersion: "24246"
+  uid: fb6e4ec9-571d-422c-8ff4-f5fb6d91cf4d
+spec:
+  backend: pytorch
+  dataset:
+    name: medalpaca/medical_meadow_medical_flashcards
+    promptWithInput: Below is an instruction that describes a task, paired with an
+      input that provides further context. Write a response that appropriately completes
+      the request.
+    promptWithoutInput: Below is an instruction that describes a task. Write a response
+      that appropriately completes the request.
+    split: train
+  hardware:
+    gpuCount: 1
+    machineType: n3-L40x1
+    nodePoolName: dj-gpu-cal-2
+    type: gpu
+  model:
+    cacheDir: /mnt/output/hf-cache
+    name: BEE-spoke-data/smol_llama-101M-GQA
+    trainingScript: /workspace/scripts/finetune.py
+  optimization:
+    bf16FullEval: true
+    lora:
+      alpha: 8
+      dropout: "0.1"
+      enabled: true
+      rank: 4
+      targetModules:
+      - q_proj
+      - v_proj
+      - k_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    mixedPrecision: bf16
+  outputPVCName: distributed-training-output-pvc
+  pytorchSpec:
+    env:
+    - name: HF_HOME
+      value: /mnt/output/hf-cache
+    - name: HF_HUB_DISABLE_XET
+      value: "1"
+    - name: NCCL_DEBUG
+      value: WARN
+    image: jmukaj/gpu-fine-tuner-hf:v2.1.0
+    masterReplicas: 1
+    resources:
+      limits:
+        cpu: "8"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+      requests:
+        cpu: "8"
+        memory: 24Gi
+  restartPolicy: Never
+  topology:
+    nodes: 2
+    processesPerNode: 1
+  training:
+    batchSize: 4
+    ddpBackend: nccl
+    ddpFindUnusedParameters: false
+    epochs: 1
+    gradAccumulationSteps: 1
+    learningRate: "2e-5"
+    loggingSteps: 10
+    maxGradNorm: "1.0"
+    maxSteps: -1
+    overwriteOutputDir: true
+    saveStrategy: epoch
+    saveTotalLimit: 2
+    validationSplit: "0.20"
+    warmupSteps: 50
+status:
+  finishTime: "2026-11-03T21:10:47Z"
+  jobName: pj-distributedtraining-llm-gpu-2
+  message: job complete — 16 metrics collected
+  phase: Succeeded
+  provisioningStartTime: "2026-11-03T20:56:56Z"
+  results:
+    bottleneck: compute-bound
+    collectionTime: 6s
+    estimatedCostUSD: "0.3889"
+    metrics:
+      allreduceBandwidthMBs: "2808.2163"
+      allreduceFraction: "0.004173"
+      checkpointSizeBytes: "15340000"
+      computeFraction: "0.943124"
+      dataloadFraction: "0.056876"
+      gradSizeBytes: "368640"
+      loss: "1.5514"
+      nfsReadBandwidthMBs: "7.4368"
+      nfsReadBytes: "45117440"
+      nfsWriteBandwidthMBs: "0.0926"
+      nfsWriteBytes: "9875456"
+      perplexity: "4.7181"
+      samplesPerSecond: "250.6000"
+      totalAllreduceBytes: "1250058240"
+      totalAllreduceSeconds: "0.4451"
+      totalSamples: "27164"
+    provisioningTime: 8m4s
+    trainingTime: 3m36s
+  startTime: "2026-11-03T20:56:36Z"
+  trainingStartTime: "2026-11-03T21:06:38Z"

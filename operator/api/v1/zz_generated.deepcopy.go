@@ -249,6 +249,10 @@ func (in *DistributedTrainingStatus) DeepCopyInto(out *DistributedTrainingStatus
 		*out = new(JobResults)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.NodeCleanupStartedAt != nil {
+		in, out := &in.NodeCleanupStartedAt, &out.NodeCleanupStartedAt
+		*out = (*in).DeepCopy()
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

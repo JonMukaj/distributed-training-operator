@@ -23,7 +23,7 @@ spec:
           - --metrics-bind-address=:8080
           - --metrics-secure=false
           - --cloud-provider=hyperstack
-          - --hyperstack-cluster-id=2050
+          - --hyperstack-cluster-id=2051
           - --hyperstack-api-url=https://infrahub-api.nexgencloud.com/v1
           # The node label that carries the node-group name (verified on a live
           # cluster: workers carry hyperstack.cloud/node-group-name=<group>).

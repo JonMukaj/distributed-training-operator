@@ -201,14 +201,56 @@ func (r *DistributedTrainingReconciler) reconcileDelete(
 ) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 	poolName := r.nodePoolName(job)
+	phase := job.Status.Phase
+
+	// Which cloud operation, if any, is the pool DELETION we must wait for?
+	//  - TeardownOperationID: started by this function on an earlier reconcile.
+	//  - GKEOperationID while Collecting/Succeeded: reconcileCollecting stores
+	//    its delete operation there.
+	// GKEOperationID in any other phase is NOT a deletion (Provisioning keeps
+	// the CREATE operation there) and must never be polled as one.
+	deleteOp := job.Status.TeardownOperationID
+	if deleteOp == "" && (phase == trainingv1.PhaseCollecting || phase == trainingv1.PhaseSucceeded) {
+		deleteOp = job.Status.GKEOperationID
+	}
 
 	switch {
-	case job.Status.Phase == trainingv1.PhaseSucceeded && job.Status.GKEOperationID == "":
-		// Pool deletion already ran and was confirmed in Collecting/Succeeded
+	case deleteOp != "":
+		done, err := r.Cloud.IsOperationDone(ctx, deleteOp)
+		if err != nil {
+			logger.Error(err, "polling node pool deletion operation", "operation", deleteOp)
+		}
+		if err != nil || !done {
+			return ctrl.Result{RequeueAfter: requeueAfter}, nil
+		}
+		logger.Info("node pool deletion confirmed", "pool", poolName)
+
+	case phase == trainingv1.PhaseSucceeded:
+		// Pool deletion ran and was confirmed in Collecting/Succeeded
 		// (reconcileSucceeded also removed the Node objects). Nothing to wait for.
 		logger.Info("deletion requested — node pool already deleted (job succeeded)", "job", job.Name, "pool", poolName)
 
-	case job.Status.GKEOperationID == "":
+	default:
+		// A CREATE may still be in flight (Provisioning). Clouds refuse to
+		// delete a pool mid-creation — GKE answers FailedPrecondition, on
+		// Hyperstack the group has no nodes yet to resolve its ID from — so
+		// wait for the create to finish (bounded by provisioningTimeout), then
+		// delete. This is the "delete during Provisioning" case: the user wants
+		// the nodes gone, and this is the earliest the cloud lets us do it.
+		if phase == trainingv1.PhaseProvisioning && job.Status.GKEOperationID != "" {
+			done, err := r.Cloud.IsOperationDone(ctx, job.Status.GKEOperationID)
+			timedOut := job.Status.ProvisioningStartTime != nil &&
+				time.Since(job.Status.ProvisioningStartTime.Time) > provisioningTimeout
+			if err == nil && !done && !timedOut {
+				logger.Info("deletion requested while node pool is still being created — waiting for the create to finish before deleting",
+					"pool", poolName, "createOperation", job.Status.GKEOperationID)
+				return ctrl.Result{RequeueAfter: requeueAfter}, nil
+			}
+			if err != nil {
+				logger.Error(err, "polling node pool create operation during deletion — attempting delete anyway", "operation", job.Status.GKEOperationID)
+			}
+		}
+
 		logger.Info("deletion requested — deleting node pool", "job", job.Name, "pool", poolName)
 		opID, err := r.Cloud.DeleteNodePool(ctx, poolName)
 		if err != nil {
@@ -216,24 +258,21 @@ func (r *DistributedTrainingReconciler) reconcileDelete(
 			case codes.NotFound:
 				// Pool already gone — fall through to node cleanup + finalizer removal.
 			case codes.FailedPrecondition:
-				// Pool exists but is not in a deletable state — typically a
-				// create operation is still in flight. Keep the finalizer,
-				// requeue, and retry once the pool reaches RUNNING.
-				logger.Info("delete deferred — pool has an operation in progress, retrying",
-					"pool", poolName)
+				// Pool exists but is not in a deletable state (an operation is
+				// still in progress). Keep the finalizer and retry.
+				logger.Info("delete deferred — pool has an operation in progress, retrying", "pool", poolName)
 				return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 			default:
 				logger.Error(err, "failed to delete node pool during CR deletion", "pool", poolName)
 				return ctrl.Result{}, err
 			}
 		} else {
-			// Record the operation and keep the finalizer until the cloud
-			// confirms the pool is gone. The Node objects are removed only
-			// then: a kubelet whose VM is still alive re-registers a deleted
-			// Node object within seconds, which would leave the stale,
-			// cordoned object behind anyway.
+			// Record the DELETE operation and keep the finalizer until the cloud
+			// confirms the pool is gone. The Node objects are removed only then:
+			// a kubelet whose VM is still alive re-registers a deleted Node
+			// object within seconds.
 			patch := client.MergeFrom(job.DeepCopy())
-			job.Status.GKEOperationID = opID
+			job.Status.TeardownOperationID = opID
 			if perr := r.Status().Patch(ctx, job, patch); perr != nil {
 				return ctrl.Result{}, fmt.Errorf("recording node pool delete operation: %w", perr)
 			}
@@ -241,20 +280,13 @@ func (r *DistributedTrainingReconciler) reconcileDelete(
 				"pool", poolName, "operation", opID)
 			return ctrl.Result{RequeueAfter: requeueAfter}, nil
 		}
-
-	default:
-		done, err := r.Cloud.IsOperationDone(ctx, job.Status.GKEOperationID)
-		if err != nil {
-			logger.Error(err, "polling node pool deletion operation", "operation", job.Status.GKEOperationID)
-		}
-		if err != nil || !done {
-			return ctrl.Result{RequeueAfter: requeueAfter}, nil
-		}
-		logger.Info("node pool deletion confirmed", "pool", poolName)
 	}
 
 	// The cloud no longer has the pool; drop the Node objects it may have left.
-	r.deleteNodesInPool(ctx, poolName)
+	// Keep the finalizer while their kubelets still heartbeat (bounded retry).
+	if !r.finishNodeCleanup(ctx, job, poolName) {
+		return ctrl.Result{RequeueAfter: nodeCleanupRequeue}, nil
+	}
 
 	// Patch only metadata.finalizers so the API server does not re-validate
 	// the spec (which may fail if e.g. spec.topology.nodes is 0).
