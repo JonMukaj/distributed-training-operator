@@ -91,11 +91,15 @@ class CustomPrinterCallback(TrainerCallback):
 #    adapters under LoRA, every parameter in full fine-tuning). That equality is
 #    reported as hook_coverage. total_allreduce_bytes is the ring-AllReduce
 #    estimate 2(n−1)/n × reduced bytes — derived, not measured on the wire.
-#  * Compute = on_step_begin → on_step_end. Dataload = previous on_step_end →
-#    this on_step_begin (the Trainer fetches the batch in that gap). Logging and
-#    in-training checkpoints also land in that gap, so keep save_strategy at
-#    epoch/no and evaluate after training. Accurate with
-#    gradient_accumulation_steps == 1 (the step callbacks fire per optimizer step).
+#  * Dataload = time the Trainer spends fetching batches: its get_batch_samples
+#    (transformers ≥ 4.46) pulls every micro-batch of an optimizer step from the
+#    DataLoader, and that method is wrapped with a timer. Exact for any
+#    gradient_accumulation_steps; excludes logging/checkpointing. On older
+#    Trainers without that method the gap between consecutive optimizer steps is
+#    used instead (dataloader_timed=false in the profile). Compute =
+#    on_step_begin → on_step_end minus fetches inside that window (normally 0,
+#    the Trainer prefetches before on_step_begin). The two fractions need not
+#    sum to 1; the remainder is Trainer bookkeeping between steps.
 #  * NFS bytes come from /proc/<pid>/io summed over this process and its
 #    descendants (DataLoader workers do the reads). Rank 0's view only.
 #  * The first --profile_warmup_steps steps are excluded from every aggregate.
@@ -207,10 +211,39 @@ class TransferProfileCallback(TrainerCallback):
         self.grad_size_bytes = 0
         self.num_params = 0
         self.trainable_params = 0
-        self.compute_times, self.dataload_times = [], []
+        self.compute_times = []
+        self.dataload_total = 0.0       # seconds inside DataLoader.__next__ while recording
+        self.dataload_in_step = 0.0     # … of which inside the current step window
+        self.in_step = False
+        self.loader_timed = False
         self.step_start = self.last_step_end = self.train_start = self.measured_end = None
         self.recording = False
         self.io0 = (0, 0)
+
+    # -- data-loader timing ---------------------------------------------------
+    def _loaded(self, dt):
+        if self.recording:
+            self.dataload_total += dt
+            if self.in_step:
+                self.dataload_in_step += dt
+
+    def _install_fetch_timer(self):
+        """Wrap Trainer.get_batch_samples (the single place the training loop
+        pulls batches from the DataLoader) with a timer. Instance-level override,
+        so it applies only to this Trainer."""
+        orig = getattr(self.trainer, "get_batch_samples", None)
+        if orig is None:
+            return  # old Trainer: fall back to step-gap timing
+        prof = self
+
+        def timed(*a, **k):
+            t0 = time.perf_counter()
+            out = orig(*a, **k)
+            prof._loaded(time.perf_counter() - t0)
+            return out
+
+        self.trainer.get_batch_samples = timed
+        self.loader_timed = True
 
     def _sync(self):
         if self.use_cuda:
@@ -228,6 +261,8 @@ class TransferProfileCallback(TrainerCallback):
         if self.world_size > 1 and isinstance(wrapped, DDP):
             wrapped.register_comm_hook(self.comm, allreduce_hook)
             self.hook_installed = True
+        self._install_fetch_timer()
+        self.recording = self.warmup == 0
         self.last_step_end = time.perf_counter()
 
     def on_step_begin(self, args, state, control, **kwargs):
@@ -236,18 +271,26 @@ class TransferProfileCallback(TrainerCallback):
             self._sync()
             self.comm.reset()
             self.io0 = read_tree_io()
-            self.train_start = self.last_step_end  # this step's batch fetch started there
+            self.train_start = self.last_step_end  # this step's batches were fetched after that
         self.recording = state.global_step >= self.warmup
-        if self.recording:
-            self.dataload_times.append(now - self.last_step_end)
+        if not self.loader_timed and self.recording:
+            self.dataload_total += now - self.last_step_end  # fallback: inter-step gap
+        self.in_step = True
+        self.dataload_in_step = 0.0
         self.step_start = now
 
     def on_step_end(self, args, state, control, **kwargs):
         self._sync()
         now = time.perf_counter()
         if self.recording:
-            self.compute_times.append(now - self.step_start)
+            # compute = step window minus any batch fetching inside it
+            self.compute_times.append(max(0.0, now - self.step_start - self.dataload_in_step))
             self.measured_end = now
+        self.in_step = False
+        # The next step's batches are fetched before its on_step_begin; attribute
+        # them to the recording state of that next step (global_step is already
+        # incremented here).
+        self.recording = state.global_step >= self.warmup
         self.last_step_end = now
 
     def finalize(self, output_dir, data_source):
@@ -258,7 +301,7 @@ class TransferProfileCallback(TrainerCallback):
         io1 = read_tree_io()
         nfs_read_b = max(0, io1[0] - self.io0[0])
         nfs_write_b = max(0, io1[1] - self.io0[1])
-        total_dataload_s = sum(self.dataload_times)
+        total_dataload_s = self.dataload_total
         total_compute_s = sum(self.compute_times)
         samples_per_step = args.per_device_train_batch_size * args.gradient_accumulation_steps * self.world_size
         total_samples = steps * samples_per_step
@@ -277,6 +320,7 @@ class TransferProfileCallback(TrainerCallback):
             "batch_size": args.per_device_train_batch_size,
             "gradient_accumulation_steps": args.gradient_accumulation_steps,
             "hook_installed": self.hook_installed,
+            "dataloader_timed": self.loader_timed,
 
             "total_training_s": total_s,
             "num_steps": steps,

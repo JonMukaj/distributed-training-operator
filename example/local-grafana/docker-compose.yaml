@@ -1,0 +1,54 @@
+# Local Prometheus + Pushgateway + Grafana for viewing experiment results WITHOUT a
+# cluster. Two ways to fill it:
+#
+#   1. Replay archived runs (results/<RUN>/ from `make hs-archive-results`):
+#        make replay-up            # start the stack (this file)
+#        make replay-results       # push every archived run → dashboard renders
+#   2. Restore a Prometheus snapshot taken on the cluster (`make prometheus-snapshot`):
+#        copy the snapshot's block directories into ./data/prometheus/ , then
+#        make replay-up            # Prometheus loads them with their original timestamps
+#
+# Grafana: http://localhost:3000 (admin / admin), dashboard "DistributedTraining Operator"
+# is provisioned from ../../operator/config/grafana/distributedtraining-dashboard.json —
+# the same file the cluster uses, so panel edits are tested here first.
+# Prometheus: http://localhost:9090   Pushgateway: http://localhost:9091
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=10y     # replayed data must not age out
+      - --web.enable-admin-api                # same as the cluster stack
+      - --web.enable-lifecycle
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./data/prometheus:/prometheus          # gitignored; drop snapshot blocks here
+    user: "0"                                  # bind-mounted data dir ownership
+    depends_on: [pushgateway]
+
+  pushgateway:
+    image: prom/pushgateway:v1.9.0
+    command:
+      - --persistence.file=/data/pushgateway.data   # pushed series survive restarts
+      - --persistence.interval=1m
+    ports: ["9091:9091"]
+    volumes:
+      - ./data/pushgateway:/data
+    user: "0"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/distributedtraining-dashboard.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../operator/config/grafana/distributedtraining-dashboard.json:/var/lib/grafana/dashboards/distributedtraining-dashboard.json:ro
+      - ./data/grafana:/var/lib/grafana
+    user: "0"
+    depends_on: [prometheus]

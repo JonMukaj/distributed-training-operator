@@ -309,19 +309,41 @@ func estimateAlpha(byN map[int32][]trainingv1.DistributedTrainingHistorySpec, ns
 	}
 
 	// ≥3 distinct n: minimize sum-of-squared residuals via golden section search.
+	avgAt := func(n int32) float64 {
+		return average(mapValues(byN[n], func(e trainingv1.DistributedTrainingHistorySpec) float64 { return e.Throughput.AsApproximateFloat64() }))
+	}
 	residualFn := func(alpha float64) float64 {
 		total := 0.0
 		for _, n := range ns {
-			avgP := average(mapValues(byN[n], func(e trainingv1.DistributedTrainingHistorySpec) float64 { return e.Throughput.AsApproximateFloat64() }))
 			predicted := pBaseline * float64(n) * eta(float64(n), alpha)
-			diff := predicted - avgP
+			diff := predicted - avgAt(n)
 			total += diff * diff
 		}
 		return total
 	}
 
-	return goldenSectionSearch(residualFn, 0, 1.0, 1e-6)
+	// The search bracket must contain the optimum. α = 1 means n nodes are no
+	// faster than one; α > 1 means adding nodes makes the job SLOWER, which a
+	// communication-bound workload on a slow interconnect really does (measured
+	// 2026-11-05: Pythia-410M full fine-tuning, η(4) ≈ 0.02 → α ≈ 14). A fixed
+	// [0, 1] bracket clipped that to 1.0 and predicted flat throughput for any n.
+	// Derive the upper bound from the closed-form estimate between the extreme
+	// node counts and leave room on either side; cap it where precision stops
+	// mattering ("do not scale" is the answer anyway).
+	hi := 1.0
+	nMin, nMax := ns[0], ns[len(ns)-1]
+	if etaMax := (avgAt(nMax) / float64(nMax)) / (avgAt(nMin) / float64(nMin)); etaMax > 0 {
+		if a := (1 - etaMax) / (etaMax * float64(nMax-nMin)); a*2 > hi {
+			hi = a * 2
+		}
+	}
+	hi = math.Min(hi, maxAlphaSearch)
+	return goldenSectionSearch(residualFn, 0, hi, 1e-6)
 }
+
+// maxAlphaSearch caps the α search bracket. Beyond it every topology above one
+// node is predicted (correctly) to be slower, and finer resolution changes nothing.
+const maxAlphaSearch = 1000.0
 
 // ---------------------------------------------------------------------------
 // Scaling model formulas

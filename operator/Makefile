@@ -158,8 +158,12 @@ OPERATOR_NS    ?= distributed-training-system
 MANAGER_DEPLOY ?= distributed-training-controller-manager
 ifeq ($(CLOUD),hyperstack)
 SAMPLE_CR      ?= config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
+# The Hyperstack sample file holds several CRs (lora-cal, e1-n*, e2-n*), each with an
+# `experiment` label. Apply exactly one; a bare apply would start them all.
+SAMPLE_APPLY   ?= kubectl apply -f $(SAMPLE_CR) -l experiment=lora-cal
 else
 SAMPLE_CR      ?= config/samples/training_v1_distributedtraining.yaml
+SAMPLE_APPLY   ?= kubectl apply -f $(SAMPLE_CR)
 endif
 ADC_CREDS_FILE ?= $(HOME)/.config/gcloud/application_default_credentials.json
 
@@ -200,6 +204,15 @@ cloud-build-deploy: cloud-check docker-build docker-push ## Build + push $(IMG),
 	kubectl apply -f config/samples/machine-costs-configmap.yaml
 	kubectl rollout status -n $(OPERATOR_NS) deploy/$(MANAGER_DEPLOY) --timeout=180s
 
+.PHONY: cloud-deploy
+cloud-deploy: cloud-check ## Deploy the operator WITHOUT building: apply $(OVERLAY) with the image pinned in config/manager (or IMG=<image:tag> to pin another pushed tag), apply machine-costs, wait. No CR is touched.
+	@if [ -n "$(IMG)" ] && [ "$(IMG)" != "controller:latest" ]; then \
+		echo "pinning image $(IMG)"; cd config/manager && "$(KUSTOMIZE)" edit set image controller=$(IMG); fi
+	@echo "deploying image: $$(grep -A1 'name: controller' config/manager/kustomization.yaml | grep -E 'newName|newTag' | awk '{print $$2}' | paste -sd: -)"
+	$(call kubectl_apply_k,$(OVERLAY))
+	kubectl apply -f config/samples/machine-costs-configmap.yaml
+	kubectl rollout status -n $(OPERATOR_NS) deploy/$(MANAGER_DEPLOY) --timeout=180s
+
 .PHONY: cloud-apply-config
 cloud-apply-config: cloud-check cloud-init ## Re-apply $(OVERLAY) without rebuilding, wait for the controller, then reset the sample CR.
 	$(call kubectl_apply_k,$(OVERLAY))
@@ -210,7 +223,17 @@ cloud-apply-config: cloud-check cloud-init ## Re-apply $(OVERLAY) without rebuil
 cloud-reset-cr: ## Delete all DistributedTraining CRs and apply $(SAMPLE_CR). Hyperstack: that is the GPU sample (provisions a paid node group).
 	kubectl delete distributedtraining --all --all-namespaces --ignore-not-found=true
 	kubectl apply -f config/samples/machine-costs-configmap.yaml
-	kubectl apply -f $(SAMPLE_CR)
+	$(SAMPLE_APPLY)
+
+HS_SAMPLES := config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
+
+.PHONY: run-experiment
+run-experiment: ## Apply ONE CR from the Hyperstack sample file by its `experiment` label. Usage: make run-experiment EXP=e1-n1 (lora-cal | e1-n1 | e1-n2 | e1-n4 | e2-n1 | e2-n2 | e2-n4)
+	@test -n "$(EXP)" || { echo "usage: make run-experiment EXP=<experiment label>"; grep -ho 'experiment: [a-z0-9-]*' $(HS_SAMPLES) | sort -u | sed 's/^/  /'; exit 1; }
+	@n=$$(kubectl apply -f $(HS_SAMPLES) -l experiment=$(EXP) --dry-run=client -o name | wc -l); \
+	test "$$n" -eq 1 || { echo "label experiment=$(EXP) matches $$n CRs, expected exactly 1"; exit 1; }
+	kubectl apply -f $(HS_SAMPLES) -l experiment=$(EXP)
+	@echo "watch: make hs-watch   | archive afterwards: make hs-archive-results CR=<name printed above>"
 
 .PHONY: cloud-rebuild
 cloud-rebuild: cloud-build-deploy cloud-reset-cr ## Full redeploy: build, push, deploy controller, reset sample CR.
@@ -257,11 +280,13 @@ archive-results: ## Copy the last run's JSON files off the PVC + dump its CR and
 
 ##@ GKE shorthands (CLOUD=gke)
 
-.PHONY: gke-init gke-build-deploy gke-apply-config gke-reset-cr gke-rebuild gke-clean gke-watch gke-logs gke-archive-results
+.PHONY: gke-init gke-build-deploy gke-deploy gke-apply-config gke-reset-cr gke-rebuild gke-clean gke-watch gke-logs gke-archive-results
 gke-init: ## = cloud-init CLOUD=gke
 	$(MAKE) cloud-init CLOUD=gke
 gke-build-deploy: ## = cloud-build-deploy CLOUD=gke
 	$(MAKE) cloud-build-deploy CLOUD=gke IMG=$(IMG)
+gke-deploy: ## = cloud-deploy CLOUD=gke (no build, no CR)
+	$(MAKE) cloud-deploy CLOUD=gke IMG=$(IMG)
 gke-apply-config: ## = cloud-apply-config CLOUD=gke
 	$(MAKE) cloud-apply-config CLOUD=gke
 gke-reset-cr: ## = cloud-reset-cr CLOUD=gke
@@ -296,11 +321,13 @@ hs-secret: ## Create/update the hyperstack-api Secret in the operator namespace 
 	@kubectl create secret generic hyperstack-api --from-literal=api-key="$$HYPERSTACK_API_KEY" \
 		-n $(OPERATOR_NS) --dry-run=client -o yaml | kubectl apply -f -
 
-.PHONY: hs-init hs-build-deploy hs-apply-config hs-reset-cr hs-rebuild hs-clean hs-watch hs-logs hs-archive-results
+.PHONY: hs-init hs-build-deploy hs-deploy hs-apply-config hs-reset-cr hs-rebuild hs-clean hs-watch hs-logs hs-archive-results
 hs-init: ## = cloud-init CLOUD=hyperstack (namespace + API-key Secret)
 	$(MAKE) cloud-init CLOUD=hyperstack
 hs-build-deploy: ## = cloud-build-deploy CLOUD=hyperstack
 	$(MAKE) cloud-build-deploy CLOUD=hyperstack IMG=$(IMG)
+hs-deploy: ## = cloud-deploy CLOUD=hyperstack (no build, no CR)
+	$(MAKE) cloud-deploy CLOUD=hyperstack IMG=$(IMG)
 hs-apply-config: ## = cloud-apply-config CLOUD=hyperstack
 	$(MAKE) cloud-apply-config CLOUD=hyperstack
 hs-reset-cr: ## = cloud-reset-cr CLOUD=hyperstack (applies the paid GPU sample)
@@ -355,6 +382,44 @@ monitoring-uninstall: ## Remove the monitoring stack AND the Prometheus PVC (det
 	kubectl -n monitoring delete pvc --all --ignore-not-found
 	kubectl -n monitoring wait --for=delete pvc --all --timeout=180s || true
 	@echo "Retain volume is detached; delete it on the Hyperstack Volumes page when the data is no longer needed."
+
+##@ Network probe
+
+NODE_GROUP ?= default
+
+.PHONY: netprobe
+netprobe: ## Measure pod-to-pod bandwidth between two nodes with iperf3 (NODE_GROUP=<hyperstack node-group name>, default: the base workers). Applies two pods + a Service, prints Gbit/s, deletes them.
+	@sed 's/hyperstack.cloud\/node-group-name: default/hyperstack.cloud\/node-group-name: $(NODE_GROUP)/' ../example/netprobe/iperf3.yaml > /tmp/netprobe.yaml
+	kubectl apply -f /tmp/netprobe.yaml
+	@echo "waiting for the client to finish (~50 s)..."
+	@kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/iperf3-client --timeout=300s >/dev/null || { kubectl describe pod iperf3-client | tail -15; kubectl delete -f /tmp/netprobe.yaml --ignore-not-found; exit 1; }
+	@kubectl logs iperf3-client | python3 -c "import json,sys; raw=sys.stdin.read(); i=raw.find('}\n{'); docs=[json.loads(raw[:i+1]), json.loads(raw[i+2:])] if i>0 else [json.loads(raw)]; names=['pod -> server (upload)','server -> pod (download)']; [print(f\"  {names[k]:26} {d['end']['sum_received']['bits_per_second']/1e9:6.2f} Gbit/s  ({d['start']['connected'][0]['local_host']} -> {d['start']['connected'][0]['remote_host']}, {d['start']['test_start']['num_streams']} streams)\") for k,d in enumerate(docs)]"
+	@echo "nodes: $$(kubectl get pod iperf3-server iperf3-client -o jsonpath='{range .items[*]}{.spec.nodeName}{\" \"}{end}')"
+	kubectl delete -f /tmp/netprobe.yaml --ignore-not-found >/dev/null
+
+##@ Offline results (local Grafana, no cluster needed)
+
+LOCAL_GRAFANA_DIR ?= ../example/local-grafana
+RESULTS_DIR       ?= ../results
+SNAPSHOT_DIR      ?= $(RESULTS_DIR)/prometheus-snapshots
+
+.PHONY: replay-up
+replay-up: ## Start local Prometheus + Pushgateway + Grafana (http://localhost:3000, admin/admin) with the repo dashboard provisioned.
+	mkdir -p $(LOCAL_GRAFANA_DIR)/data/prometheus $(LOCAL_GRAFANA_DIR)/data/pushgateway $(LOCAL_GRAFANA_DIR)/data/grafana
+	docker compose -f $(LOCAL_GRAFANA_DIR)/docker-compose.yaml up -d
+	@echo "Grafana: http://localhost:3000 (admin/admin)  Prometheus: http://localhost:9090  Pushgateway: http://localhost:9091"
+
+.PHONY: replay-results
+replay-results: ## Push every archived run in $(RESULTS_DIR) into the local stack (make replay-up first). ONLY="run-a run-b" to restrict.
+	python3 ../script/replay_metrics.py --results $(RESULTS_DIR) $(if $(ONLY),--only $(ONLY),)
+
+.PHONY: replay-down
+replay-down: ## Stop the local stack (data under example/local-grafana/data/ is kept).
+	docker compose -f $(LOCAL_GRAFANA_DIR)/docker-compose.yaml down
+
+.PHONY: prometheus-snapshot
+prometheus-snapshot: ## Snapshot the CLUSTER's Prometheus TSDB into $(SNAPSHOT_DIR)/<name>/ (run before monitoring-uninstall / cluster teardown).
+	SNAPSHOT_DIR=$(SNAPSHOT_DIR) MONITORING_NS=monitoring bash ../script/prometheus_snapshot.sh
 
 ##@ Deployment
 

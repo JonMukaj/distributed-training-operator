@@ -1,0 +1,22 @@
+{
+    "allreduce_bandwidth_MBs": 0.0,
+    "allreduce_fraction": 0.0,
+    "compute_fraction": 0.9938999396768498,
+    "dataload_fraction": 0.006100060323150332,
+    "epoch": 1.0,
+    "eval_loss": 3.055647134780884,
+    "eval_runtime": 3.9732,
+    "eval_samples": 1000,
+    "eval_samples_per_second": 251.687,
+    "eval_steps_per_second": 31.461,
+    "grad_size_bytes": 1621336064,
+    "nfs_read_bandwidth_MBs": 0.11162378794754435,
+    "nfs_read_bytes": 798720,
+    "perplexity": 21.23492293865714,
+    "total_allreduce_bytes": 0,
+    "train_loss": 3.0649642333984377,
+    "train_runtime": 1176.4107,
+    "train_samples": 40000,
+    "train_samples_per_second": 34.002,
+    "train_steps_per_second": 8.5
+}

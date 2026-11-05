@@ -54,7 +54,7 @@
       }
     ]
   },
-  "description": "DistributedTraining Operator \u2014 lifecycle, solver accuracy, and training results",
+  "description": "DistributedTraining Operator — lifecycle, solver accuracy, and training results",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -465,7 +465,7 @@
             "uid": "${datasource}"
           },
           "expr": "distributedtraining_solver_estimated_time_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
-          "legendFormat": "Predicted \u2014 {{dj_name}}",
+          "legendFormat": "Predicted — {{dj_name}}",
           "refId": "A"
         },
         {
@@ -474,7 +474,7 @@
             "uid": "${datasource}"
           },
           "expr": "distributedtraining_training_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
-          "legendFormat": "Actual \u2014 {{dj_name}}",
+          "legendFormat": "Actual — {{dj_name}}",
           "refId": "B"
         }
       ],
@@ -534,7 +534,7 @@
             "uid": "${datasource}"
           },
           "expr": "distributedtraining_solver_estimated_cost_usd{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
-          "legendFormat": "Predicted \u2014 {{dj_name}}",
+          "legendFormat": "Predicted — {{dj_name}}",
           "refId": "A"
         },
         {
@@ -543,7 +543,7 @@
             "uid": "${datasource}"
           },
           "expr": "distributedtraining_cost_usd_actual{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
-          "legendFormat": "Actual \u2014 {{dj_name}}",
+          "legendFormat": "Actual — {{dj_name}}",
           "refId": "B"
         }
       ],
@@ -737,11 +737,11 @@
             "uid": "${datasource}"
           },
           "expr": "distributedtraining_solver_alpha{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
-          "legendFormat": "\u03b1 \u2014 {{dj_name}}",
+          "legendFormat": "α — {{dj_name}}",
           "refId": "A"
         }
       ],
-      "title": "Scaling overhead \u03b1 (lower is better)",
+      "title": "Scaling overhead α (lower is better)",
       "type": "stat"
     },
     {
@@ -866,7 +866,7 @@
       ],
       "title": "Time Prediction Error % (− = faster than predicted)",
       "type": "stat",
-      "description": "Signed prediction error: 100 \u00d7 (actual \u2212 predicted) / predicted. Negative = actual finished faster than predicted (green, solver was conservative); positive = actual ran slower than predicted (red, solver was optimistic / promise missed)."
+      "description": "Signed prediction error: 100 × (actual − predicted) / predicted. Negative = actual finished faster than predicted (green, solver was conservative); positive = actual ran slower than predicted (red, solver was optimistic / promise missed)."
     },
     {
       "datasource": {
@@ -875,7 +875,7 @@
       },
       "type": "timeseries",
       "id": 21,
-      "title": "Scaling overhead \u03b1 \u2014 convergence across runs",
+      "title": "Scaling overhead α — convergence across runs",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -889,7 +889,7 @@
             "uid": "${datasource}"
           },
           "expr": "max(distributedtraining_solver_alpha{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
-          "legendFormat": "\u03b1 (latest across runs)",
+          "legendFormat": "α (latest across runs)",
           "refId": "A"
         }
       ],
@@ -932,7 +932,7 @@
           "mode": "multi"
         }
       },
-      "description": "Latest \u03b1 value across all selected runs at each timestamp. Each step corresponds to a new solver invocation incorporating a fresh history entry. A flattening step pattern indicates convergence: \u03b1 is stabilizing as more data accumulates."
+      "description": "Latest α value across all selected runs at each timestamp. Each step corresponds to a new solver invocation incorporating a fresh history entry. A flattening step pattern indicates convergence: α is stabilizing as more data accumulates."
     },
     {
       "collapsed": false,
@@ -1092,7 +1092,7 @@
       },
       "type": "bargauge",
       "id": 22,
-      "title": "Pod Runtime (s) \u2014 Baseline vs Operator at same N",
+      "title": "Pod Runtime (s) — Baseline vs Operator at same N",
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -1151,7 +1151,855 @@
         },
         "overrides": []
       },
-      "description": "Multi-select baseline-b-2/3 and distributedtraining-cal-2node/3node to compare pod runtime at matched node counts. Operator and baseline use the same training_seconds window (PyTorchJob status.startTime \u2192 completionTime)."
+      "description": "Multi-select baseline-b-2/3 and distributedtraining-cal-2node/3node to compare pod runtime at matched node counts. Operator and baseline use the same training_seconds window (PyTorchJob status.startTime → completionTime)."
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "id": 25,
+      "panels": [],
+      "title": "Transfer Analysis",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "From transfer_profile.json. compute + dataload ≈ 1 at one node. AllReduce is the union of in-flight AllReduce intervals — an upper bound, DDP overlaps it with backward.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 54
+      },
+      "id": 26,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_compute_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}} — compute",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_dataload_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}} — data load",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_allreduce_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}} — AllReduce (upper bound)",
+          "refId": "C"
+        }
+      ],
+      "title": "Transfer fractions per run — share of the measured step time",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Ring-estimate wire bytes (2(n−1)/n × reduced) ÷ AllReduce time. 0 at one node.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "MBs",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 12,
+        "y": 54
+      },
+      "id": 27,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_allreduce_bandwidth_mbs{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "AllReduce bandwidth per run",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "nfs_read_bytes ÷ data-load time, rank 0's process tree. 0 for synthetic runs or page-cache hits.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "MBs",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 6,
+        "x": 18,
+        "y": 54
+      },
+      "id": 28,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_nfs_read_bandwidth_mbs{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "NFS read bandwidth per run",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Same rule as the operator's classifier (phases.go classifyBottleneck): compute ≥ 0.6 → compute-bound; else AllReduce ≥ data-load → communication-bound; else data-bound. The operator's own verdict is in the CR status.results.bottleneck and the Bottleneck event.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "compute-bound",
+                  "color": "blue"
+                },
+                "2": {
+                  "text": "communication-bound",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "data-bound",
+                  "color": "red"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "id": 29,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "1 * (distributedtraining_compute_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"} >= bool 0.6) + 2 * ((distributedtraining_compute_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"} < bool 0.6) * (distributedtraining_allreduce_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"} >= bool distributedtraining_dataload_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"})) + 3 * ((distributedtraining_compute_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"} < bool 0.6) * (distributedtraining_allreduce_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"} < bool distributedtraining_dataload_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"}))",
+          "legendFormat": "{{dj_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Bottleneck class per run",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Scaling Summary",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "The gap between the two is the serial remainder inside the training window (model load, eval, save).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 71
+      },
+      "id": 31,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(distributedtraining_training_metric{namespace=\"$namespace\",dj_name=~\"$dj_name\",metric=\"totalSamples\"} / on(namespace,dj_name) distributedtraining_training_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "{{dj_name}} — wall-clock W/T",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_training_metric{namespace=\"$namespace\",dj_name=~\"$dj_name\",metric=\"samplesPerSecond\"}",
+          "legendFormat": "{{dj_name}} — inner loop",
+          "refId": "B"
+        }
+      ],
+      "title": "Throughput per run: wall-clock (W ÷ training s, what the solver fits) vs inner loop",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Divide by the 1-node value of the same series to get η(n); α = (1−η)/(η(n−1)).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 71
+      },
+      "id": 32,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(distributedtraining_training_metric{namespace=\"$namespace\",dj_name=~\"$dj_name\",metric=\"totalSamples\"} / on(namespace,dj_name) distributedtraining_training_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"}) / on(namespace,dj_name) distributedtraining_nodes_provisioned{namespace=\"$namespace\",dj_name=~\"$dj_name\"}",
+          "legendFormat": "{{dj_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Per-node wall-clock throughput (scaling efficiency proxy)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "One row per run (latest values). Columns F–H (fractions) against E (α) give the scaling-explanation relationship.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "nodes"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "provisioning s"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "training s"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cost USD"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 79
+      },
+      "id": 33,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "run"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_nodes_provisioned{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_provisioning_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "B",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_training_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "C",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(distributedtraining_training_metric{namespace=\"$namespace\",dj_name=~\"$dj_name\",metric=\"totalSamples\"} / on(namespace,dj_name) distributedtraining_training_seconds{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "D",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_solver_alpha{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "E",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_allreduce_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "F",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_dataload_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "G",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_compute_fraction{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "H",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (namespace, dj_name) (distributedtraining_cost_usd_actual{namespace=\"$namespace\",dj_name=~\"$dj_name\"})",
+          "legendFormat": "",
+          "refId": "I",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "namespace": true,
+              "metric": true,
+              "__name__": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "dj_name": "run",
+              "Value #A": "nodes",
+              "Value #B": "provisioning s",
+              "Value #C": "training s",
+              "Value #D": "throughput W/T",
+              "Value #E": "α (solver)",
+              "Value #F": "AllReduce frac",
+              "Value #G": "data-load frac",
+              "Value #H": "compute frac",
+              "Value #I": "cost USD"
+            },
+            "indexByName": {
+              "run": 0,
+              "nodes": 1,
+              "provisioning s": 2,
+              "training s": 3,
+              "throughput W/T": 4,
+              "α (solver)": 5,
+              "AllReduce frac": 6,
+              "data-load frac": 7,
+              "compute frac": 8,
+              "cost USD": 9
+            }
+          }
+        }
+      ],
+      "title": "Per-run scaling summary",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 89
+      },
+      "id": 34,
+      "panels": [],
+      "title": "Quality & Lifecycle",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "exp(eval_loss) on the validation/test split. With fixed total work, more nodes = fewer optimizer steps at a larger effective batch — expect a small drift.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 90
+      },
+      "id": 35,
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "distributedtraining_training_metric{namespace=\"$namespace\",dj_name=~\"$dj_name\",metric=\"perplexity\"}",
+          "legendFormat": "{{dj_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Perplexity per run (held-out eval)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Number of CRs (matching the filters) that ever reached each phase. Counts series rather than counter increases so it also works for replayed data, where counters never move.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 90
+      },
+      "id": 36,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(distributedtraining_phase_transitions_total{namespace=\"$namespace\",dj_name=~\"$dj_name\",phase=\"Succeeded\"}) or vector(0)",
+          "legendFormat": "Succeeded",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count(distributedtraining_phase_transitions_total{namespace=\"$namespace\",dj_name=~\"$dj_name\",phase=\"Failed\"}) or vector(0)",
+          "legendFormat": "Failed",
+          "refId": "B"
+        }
+      ],
+      "title": "Runs reaching Succeeded / Failed",
+      "type": "stat"
     }
   ],
   "refresh": "10s",
@@ -1228,6 +2076,6 @@
   "timezone": "browser",
   "title": "DistributedTraining Operator",
   "uid": "distributedtraining-operator",
-  "version": 1,
+  "version": 5,
   "weekStart": ""
 }

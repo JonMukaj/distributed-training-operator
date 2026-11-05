@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Replayed metrics arrive via the Pushgateway. honor_labels keeps the pushed
+  # namespace/dj_name labels (the dashboard filters on them) instead of letting
+  # Prometheus overwrite them with scrape-target labels.
+  - job_name: pushgateway
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]

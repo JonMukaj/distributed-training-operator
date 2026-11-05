@@ -3,3 +3,5 @@ __pycache__
 # local smoke-test outputs (see LOCAL_TESTING.md)
 out/
 *-tok/
+# local Grafana/Prometheus stack state (example/local-grafana)
+example/local-grafana/data/

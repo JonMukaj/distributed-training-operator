@@ -781,7 +781,15 @@ make hs-build-deploy IMG=jmukaj/distributed-training-operator:<tag>
 ```
 
 `hs-build-deploy` refuses to run while the overlay still has `YOUR_*` placeholders
-(`make cloud-check CLOUD=hyperstack` runs the same test). To change only overlay flags without rebuilding, use `make hs-apply-config`; note it also resets the sample CR, which on Hyperstack is the paid GPU sample.
+(`make cloud-check CLOUD=hyperstack` runs the same test).
+
+To (re)deploy **without building** — a fresh cluster, a changed overlay flag, or rolling
+back to a tag that is already on Docker Hub — use `make hs-deploy`. It applies the overlay
+with the image pinned in `config/manager/kustomization.yaml` (the last tag you built, or
+`IMG=jmukaj/distributed-training-operator:<tag>` to pin another pushed one), applies the
+machine-costs ConfigMap and waits for the rollout. It never touches CRs. Avoid
+`make hs-apply-config` for this: it does the same and then resets the sample CR, which on
+Hyperstack starts the paid GPU sample.
 
 > **Local dev loop:** to iterate without building an image, run the controller locally
 > against the cluster (uses your current kubeconfig). `make run` takes no flags, so pass
@@ -816,11 +824,16 @@ make monitoring-grafana
 
 ### Step 7 — Run the GPU fine-tuning sample
 
+> Day-to-day runbook for the experiment campaign (pre-flight checks, run matrix, per-run
+> verification, where every thesis number lives, failure playbook): [`EXPERIMENTS.md`](EXPERIMENTS.md).
+> Panel-by-panel reference for the Grafana dashboard (definition, computation, what to
+> expect from the large-model runs): [`METRICS.md`](METRICS.md).
+
 `config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml` is the GPU
 counterpart of the CPU sample: the same smol_llama-101M-GQA LoRA workload on an
 ephemeral **`n3-L40x1`** node group (one NVIDIA L40 48 GB per node, 28 vCPU, 58 GB RAM,
 region CANADA-1; `n3-A100x1` is the commented alternative in the file), image
-`jmukaj/gpu-fine-tuner-hf:v2.1.0`. It is
+`jmukaj/gpu-fine-tuner-hf:v2.3.0`. It is
 deliberately *not* in `config/samples/kustomization.yaml`, so `kubectl apply -k
 config/samples/` never starts a GPU job by accident.
 
@@ -846,9 +859,14 @@ ignored and the sample pins the GPU with the `nvidia.com/gpu: "1"` limit.
 
 **Run sequence** — the solver needs two node counts in history before it can fit α:
 
+> The sample file holds **several CRs**, each with an `experiment` label (`lora-cal`,
+> `e1-n1/n2/n4`, `e2-n1/n2/n4`). Always apply **one** with a label selector, or via
+> `make run-experiment EXP=<label>`; a bare `kubectl apply -f` of the file would start them
+> all and bill a GPU node group for each.
+
 ```sh
 # Calibration run 1 (nodes: 1 as shipped)
-kubectl apply -f config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
+make run-experiment EXP=lora-cal     # = kubectl apply -f <file> -l experiment=lora-cal
 kubectl get dj distributedtraining-llm-gpu-1 -w        # wait for Succeeded
 
 # Calibration run 2: set topology.nodes: 2, a new metadata.name and a new
@@ -867,12 +885,37 @@ the config hash that groups history entries (see [Config hash](#config-hash)).
 Watch the node group appear and disappear in the Hyperstack console under the
 cluster's **Node groups** tab.
 
+**Thesis transfer experiments (Ch 6).** The same file carries the Pythia-410M **full**
+fine-tuning series: `e1-n1`, `e1-n2`, `e1-n4` (synthetic tokens, 40k samples, isolates
+AllReduce) and `e2-n1`, `e2-n2`, `e2-n4` (WikiText-103 text mode from the NFS cache, 40k
+samples). They use a `pytorchSpec.command` override because the default torchrun builder
+cannot express `--use_lora false`, `--synthetic_samples` or a dataset config name; the
+`model`/`dataset`/`training` fields are still set so each series has its own config hash.
+Run one at a time, archive after each, discard the first run of each series as the cache
+warm-up (E2's first run also tokenises WikiText-103 once into the PVC cache):
+
+```sh
+make run-experiment EXP=e1-n1 && kubectl get dj e1-n1-pythia410m -w
+make hs-archive-results CR=e1-n1-pythia410m RUN=e1-n1-warmup
+make run-experiment EXP=e1-n1 ... EXP=e1-n2 ... EXP=e1-n4, then e2-n1/n2/n4
+```
+
+Check on the first E2 run that `transfer_profile.json` shows `hook_coverage` = 1.0 and
+`nfs_read_bytes` > 0, and that `status.results.bottleneck` moves from `compute-bound`
+toward `communication-bound` as nodes increase.
+
 **Reading the results**
 
 ```sh
 kubectl get dj distributedtraining-llm-gpu-1 -o jsonpath='{.status.results}' | jq .
 kubectl get distributedtraininghistories -o yaml      # throughput, α inputs, cost per run
 ```
+
+Results can also be viewed **offline**, without any cluster: `make replay-up` starts a local
+Prometheus/Pushgateway/Grafana stack (`example/local-grafana/`) and `make replay-results`
+pushes every archived run into it with the operator's metric names, so the same dashboard
+renders from `results/`. `make prometheus-snapshot` saves the cluster Prometheus' TSDB for
+the real time series. Details: [`EXPERIMENTS.md`](EXPERIMENTS.md) §7.
 
 Raw files (`all_results.json`, `transfer_profile.json`, `train_results.json`,
 `eval_results.json`, `trainer_state.json` with the per-step loss curve; the `v2.1.0` image
