@@ -228,7 +228,7 @@ cloud-reset-cr: ## Delete all DistributedTraining CRs and apply $(SAMPLE_CR). Hy
 HS_SAMPLES := config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml
 
 .PHONY: run-experiment
-run-experiment: ## Apply ONE CR from the Hyperstack sample file by its `experiment` label. Usage: make run-experiment EXP=e1-n1 (lora-cal | e1-n1 | e1-n2 | e1-n4 | e2-n1 | e2-n2 | e2-n4)
+run-experiment: ## Apply ONE CR from the Hyperstack sample file by its `experiment` label. Usage: make run-experiment EXP=e1-n1 (lora-cal | e1-n1 | e1-n2 | e1-n5 | e1-n7 | e1-n10 | e2-n1 | e2-n2 | e2-n5 | e2-n7 | e2-n10 | obj-e2-2pt | obj-e2-tight | obj-e2-mid | e2-n2-rep)
 	@test -n "$(EXP)" || { echo "usage: make run-experiment EXP=<experiment label>"; grep -ho 'experiment: [a-z0-9-]*' $(HS_SAMPLES) | sort -u | sed 's/^/  /'; exit 1; }
 	@n=$$(kubectl apply -f $(HS_SAMPLES) -l experiment=$(EXP) --dry-run=client -o name | wc -l); \
 	test "$$n" -eq 1 || { echo "label experiment=$(EXP) matches $$n CRs, expected exactly 1"; exit 1; }
@@ -277,6 +277,10 @@ archive-results: ## Copy the last run's JSON files off the PVC + dump its CR and
 		xargs -r kubectl get -o yaml > $(RESULTS_DIR)/$(RUN)/history.yaml; \
 		test -s $(RESULTS_DIR)/$(RUN)/history.yaml && echo "wrote history.yaml" || { rm -f $(RESULTS_DIR)/$(RUN)/history.yaml; echo "no history entry for $(CR) (HistorySkipped?)"; }
 	@ls -la $(RESULTS_DIR)/$(RUN)
+
+.PHONY: restore-history
+restore-history: ## Recreate history CRs on the current cluster from $(RESULTS_DIR)/*/history.yaml (CRDs must exist). ONLY="run-a run-b", EXCLUDE="run-c", DRY=1 prints only. Skips warm-ups and duplicate archives.
+	$(ANALYSIS_PY) ../script/restore_history.py --results $(RESULTS_DIR) $(if $(ONLY),--only $(ONLY),) $(if $(EXCLUDE),--exclude $(EXCLUDE),) $(if $(DRY),--dry-run,)
 
 ##@ GKE shorthands (CLOUD=gke)
 
@@ -412,6 +416,16 @@ replay-up: ## Start local Prometheus + Pushgateway + Grafana (http://localhost:3
 .PHONY: replay-results
 replay-results: ## Push every archived run in $(RESULTS_DIR) into the local stack (make replay-up first). ONLY="run-a run-b" to restrict.
 	python3 ../script/replay_metrics.py --results $(RESULTS_DIR) $(if $(ONLY),--only $(ONLY),)
+
+ANALYSIS_PY ?= ../script/venv/bin/python
+ANALYSIS_OUT ?= ../analysis_out
+.PHONY: analyze
+analyze: ## Thesis tables and figures from $(RESULTS_DIR) into $(ANALYSIS_OUT). Optional: NETPROBE_GBIT=3.1 draws the iperf3 rate; ANALYSIS_PY=python3 outside the venv.
+	$(ANALYSIS_PY) ../script/analysis/analyze.py --results $(RESULTS_DIR) --out $(ANALYSIS_OUT) $(if $(NETPROBE_GBIT),--netprobe-gbit $(NETPROBE_GBIT),)
+
+.PHONY: runlog
+runlog: ## Write $(RESULTS_DIR)/RUNLOG.md (one row per archived run) from the archives and results/<RUN>/notes.txt.
+	$(ANALYSIS_PY) ../script/analysis/analyze.py --results $(RESULTS_DIR) --runlog
 
 .PHONY: replay-down
 replay-down: ## Stop the local stack (data under example/local-grafana/data/ is kept).

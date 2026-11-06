@@ -63,6 +63,13 @@ Timings are not meaningful here (one GPU, gloo), the run proves the instrumentat
 | `grad_size_bytes` | trainable params × 4 (fp32 master weights under bf16 autocast) |
 | `total_allreduce_bytes` | `total_reduced_bytes × 2(n−1)/n`, equal to it at n = 2 |
 | `allreduce_fraction` | below 1.0; `allreduce_bucket_sum_s` is larger than `total_allreduce_s` |
+| `allreduce_timing` | `cuda_events` (the CUDA path; `callback` only on CPU tensors) |
+| `compute_excludes_allreduce` | `true`; `compute_fraction + allreduce_fraction + dataload_fraction` is about 1 (the remainder is Trainer bookkeeping) |
+| `allreduce_timing_check` | `ok`: the hook's per-step time is within 0.5 to 2 times the blocking probe (`allreduce_probe_*`, `--profile_probe_mib`, default 256) |
+
+Local runs share one GPU between both ranks through gloo, so absolute bandwidths mean nothing
+(about 1.5 GB/s here), but hook and probe must agree. The real NCCL check happens on the
+cluster: on 2 nodes the hook bandwidth must be near the probe bandwidth and near the link rate.
 
 `--dataset_name synthetic` builds random-token rows (count from `--max_train_samples`,
 or `--synthetic_samples`). The 80/20 validation split still applies, so
@@ -164,7 +171,7 @@ keyword rather than the removed `use_auth_token=`).
   bound on exclusive communication time because DDP overlaps it with backward.
 - `total_allreduce_bytes` is the ring-AllReduce estimate, not a wire measurement;
   `hook_coverage` is the real instrumentation check.
-- Dataload time is the gap between consecutive optimizer steps, so anything the
-  Trainer does there (logging, mid-run checkpoints, mid-run evaluation) is counted
-  as data loading. Accurate with `gradient_accumulation_steps == 1`.
+- Dataload time is measured inside the Trainer's batch fetching (`get_batch_samples`,
+  transformers ≥ 4.46), so it is exact for any `gradient_accumulation_steps` and excludes
+  logging/checkpointing; `dataloader_timed` in the profile says which method was used.
 - NFS byte counters cover rank 0's process tree only.

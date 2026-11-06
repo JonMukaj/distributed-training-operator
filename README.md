@@ -587,6 +587,11 @@ This section covers the operator development workflow on a [Hyperstack](https://
 > From Step 3 on, every command runs from `operator/`, where the Makefile lives; paths
 > into `example/` are therefore written as `../example/...`.
 
+> **Automated.** Steps 1–5 and 3b (cluster, dependencies, monitoring, overlay, operator)
+> run in one go with `HYPERSTACK_API_KEY=... [IMG=<image:tag>] script/hyperstack-bootstrap.sh` (Grafana keeps the default `admin` login unless `GRAFANA_PASSWORD` is set).
+> It stops before Step 7, so no GPU node group is started. Every step is idempotent;
+> `START_STEP=<n>` resumes at a later step. The manual steps below remain the reference.
+
 ### Prerequisites
 
 - **Tooling:** `go` v1.25.3+, `docker` 17.03+, `kubectl` v1.11.3+, `helm` 3+,
@@ -830,10 +835,12 @@ make monitoring-grafana
 > expect from the large-model runs): [`METRICS.md`](METRICS.md).
 
 `config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml` is the GPU
-counterpart of the CPU sample: the same smol_llama-101M-GQA LoRA workload on an
+counterpart of the CPU sample. It holds the smol_llama-101M-GQA LoRA calibration CR (the
+first document), and the thesis experiment CRs selected with `make run-experiment
+EXP=<label>` (`e1-n*`, `e2-n*`, `obj-e2-*`, `e2-n2-rep`; see `EXPERIMENTS.md`). The LoRA CR runs on an
 ephemeral **`n3-L40x1`** node group (one NVIDIA L40 48 GB per node, 28 vCPU, 58 GB RAM,
 region CANADA-1; `n3-A100x1` is the commented alternative in the file), image
-`jmukaj/gpu-fine-tuner-hf:v2.3.0`. It is
+`jmukaj/gpu-fine-tuner-hf:v2.6.0`. It is
 deliberately *not* in `config/samples/kustomization.yaml`, so `kubectl apply -k
 config/samples/` never starts a GPU job by accident.
 
@@ -860,7 +867,7 @@ ignored and the sample pins the GPU with the `nvidia.com/gpu: "1"` limit.
 **Run sequence** — the solver needs two node counts in history before it can fit α:
 
 > The sample file holds **several CRs**, each with an `experiment` label (`lora-cal`,
-> `e1-n1/n2/n4`, `e2-n1/n2/n4`). Always apply **one** with a label selector, or via
+> `e1-n1/n2/n5/n7/n10`, `e2-n1/n2/n5/n7/n10`). Always apply **one** with a label selector, or via
 > `make run-experiment EXP=<label>`; a bare `kubectl apply -f` of the file would start them
 > all and bill a GPU node group for each.
 
@@ -886,9 +893,9 @@ Watch the node group appear and disappear in the Hyperstack console under the
 cluster's **Node groups** tab.
 
 **Thesis transfer experiments (Ch 6).** The same file carries the Pythia-410M **full**
-fine-tuning series: `e1-n1`, `e1-n2`, `e1-n4` (synthetic tokens, 40k samples, isolates
-AllReduce) and `e2-n1`, `e2-n2`, `e2-n4` (WikiText-103 text mode from the NFS cache, 40k
-samples). They use a `pytorchSpec.command` override because the default torchrun builder
+fine-tuning series: `e1-n1`, `e1-n2`, `e1-n5`, `e1-n7`, `e1-n10` (synthetic tokens, 40k samples,
+isolates AllReduce) and `e2-n1`, `e2-n2`, `e2-n5`, `e2-n7`, `e2-n10` (WikiText-103 text mode
+from the NFS cache, 40k samples). They use a `pytorchSpec.command` override because the default torchrun builder
 cannot express `--use_lora false`, `--synthetic_samples` or a dataset config name; the
 `model`/`dataset`/`training` fields are still set so each series has its own config hash.
 Run one at a time, archive after each, discard the first run of each series as the cache
@@ -897,7 +904,7 @@ warm-up (E2's first run also tokenises WikiText-103 once into the PVC cache):
 ```sh
 make run-experiment EXP=e1-n1 && kubectl get dj e1-n1-pythia410m -w
 make hs-archive-results CR=e1-n1-pythia410m RUN=e1-n1-warmup
-make run-experiment EXP=e1-n1 ... EXP=e1-n2 ... EXP=e1-n4, then e2-n1/n2/n4
+make run-experiment EXP=e1-n1 ... EXP=e1-n2 ... EXP=e1-n5 ... EXP=e1-n7 ... EXP=e1-n10, then the E2 series (see EXPERIMENTS.md §1 for the order)
 ```
 
 Check on the first E2 run that `transfer_profile.json` shows `hook_coverage` = 1.0 and
@@ -918,8 +925,8 @@ renders from `results/`. `make prometheus-snapshot` saves the cluster Prometheus
 the real time series. Details: [`EXPERIMENTS.md`](EXPERIMENTS.md) §7.
 
 Raw files (`all_results.json`, `transfer_profile.json`, `train_results.json`,
-`eval_results.json`, `trainer_state.json` with the per-step loss curve; the `v2.1.0` image
-carries the instrumented `script/gpu/finetune.py`) land under `/exports/checkpoints` on the
+`eval_results.json`, `trainer_state.json` with the per-step loss curve; the training image
+(`v2.6.0`) carries the instrumented `script/gpu/finetune.py`) land under `/exports/checkpoints` on the
 NFS server — and **every job overwrites them**, since all jobs share that output directory.
 Archive each run before starting the next:
 

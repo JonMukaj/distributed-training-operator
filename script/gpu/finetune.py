@@ -80,12 +80,25 @@ class CustomPrinterCallback(TrainerCallback):
 # loading (NFS/storage)?  
 #
 # Measurement notes
-#  * Timers are closed with torch.cuda.synchronize() on GPU; CUDA is async and
+#  * Step timers are closed with torch.cuda.synchronize() on GPU; CUDA is async and
 #    without it the fractions would measure kernel-launch time.
-#  * AllReduce time is the UNION of in-flight intervals seen by a DDP comm hook
-#    (the clock runs while ≥1 bucket is outstanding). Summing per-bucket
-#    durations double-counts overlapping buckets. DDP overlaps communication with
-#    the backward pass, so this is an UPPER BOUND on exclusive comm time.
+#  * AllReduce time is the UNION of in-flight intervals seen by a DDP comm hook.
+#    On CUDA the interval of each bucket is taken with CUDA EVENTS: a start event
+#    on the compute stream when the bucket's gradients are ready, and an end event
+#    recorded inside the future's callback, whose stream is ordered after the NCCL
+#    work. Wall-clock timestamps in that callback are WRONG for NCCL: the future
+#    completes when the kernel is queued, not when it finishes, so they measured
+#    about 4 ms per step instead of 3.4 s (found on the first 2-node run,
+#    2026-11-06: 370 GB/s "bandwidth" on a ~400 MB/s link). Events are read after
+#    the step-end synchronize, so nothing blocks mid-step. On CPU (gloo) the
+#    callback does fire at completion and perf_counter is used.
+#    Summing per-bucket durations double-counts overlapping buckets. DDP overlaps
+#    communication with the backward pass, so this is an UPPER BOUND on exclusive
+#    comm time.
+#  * Cross-check: at train start every multi-node run times a few blocking
+#    all-reduces of --profile_probe_mib MiB (chunked like DDP buckets, repeated until stable) and reports
+#    allreduce_probe_*; allreduce_timing_check says whether the hook's per-step
+#    time is consistent with it (ratio inside [0.5, 2.0]).
 #  * Bytes: total_reduced_bytes is what the hook observed; per step it must equal
 #    grad_size_bytes (= bytes of all parameters with requires_grad — only the
 #    adapters under LoRA, every parameter in full fine-tuning). That equality is
@@ -98,8 +111,12 @@ class CustomPrinterCallback(TrainerCallback):
 #    Trainers without that method the gap between consecutive optimizer steps is
 #    used instead (dataloader_timed=false in the profile). Compute =
 #    on_step_begin → on_step_end minus fetches inside that window (normally 0,
-#    the Trainer prefetches before on_step_begin). The two fractions need not
-#    sum to 1; the remainder is Trainer bookkeeping between steps.
+#    the Trainer prefetches before on_step_begin) MINUS the AllReduce time,
+#    because the AllReduce runs inside that window (v2.5.0 and older reported
+#    the whole window, so compute + AllReduce + dataload came to 1.4 on a
+#    communication-bound run and the operator called it compute-bound). The
+#    three fractions now sum to about 1; the remainder is Trainer bookkeeping
+#    between steps. compute_excludes_allreduce=true marks profiles with this meaning.
 #  * NFS bytes come from /proc/<pid>/io summed over this process and its
 #    descendants (DataLoader workers do the reads). Rank 0's view only.
 #  * The first --profile_warmup_steps steps are excluded from every aggregate.
@@ -161,6 +178,8 @@ class CommState:
         self.world_size = world_size
         self.wire_factor = 2.0 * (world_size - 1) / world_size if world_size > 1 else 0.0
         self.lock = threading.Lock()
+        self.timing = "none"     # "cuda_events" or "callback", set by the first hook call
+        self.step_ref = None     # CUDA event recorded at step start: common time base for this step's events
         self.reset()
 
     def reset(self):
@@ -168,16 +187,53 @@ class CommState:
         self.bucket_sum_s = 0.0  # plain per-bucket sum (overlaps double-counted)
         self.reduced_bytes = 0
         self.wire_bytes = 0.0
-        self.inflight = 0
+        self.inflight = 0        # callback timing only
         self.span_start = 0.0
+        self.pending = []        # (start_event, end_event) pairs of the current step, CUDA timing only
+        self.events_dropped = 0
+
+    def flush_events(self):
+        """Turn this step's event pairs into the union of intervals. Call after
+        torch.cuda.synchronize() so every event has completed."""
+        with self.lock:
+            pend, self.pending = self.pending, []
+        if not pend:
+            return
+        ref = self.step_ref if self.step_ref is not None else pend[0][0]
+        spans = []
+        for start, end in pend:
+            try:
+                spans.append((ref.elapsed_time(start) / 1e3, ref.elapsed_time(end) / 1e3))
+            except RuntimeError:       # end event never recorded (callback did not run)
+                self.events_dropped += 1
+        spans.sort()
+        union, cur_s, cur_e = 0.0, None, None
+        for a, b in spans:
+            self.bucket_sum_s += max(0.0, b - a)
+            if cur_e is None or a > cur_e:
+                if cur_e is not None:
+                    union += cur_e - cur_s
+                cur_s, cur_e = a, b
+            else:
+                cur_e = max(cur_e, b)
+        if cur_e is not None:
+            union += cur_e - cur_s
+        self.total_s += union
 
 
 def allreduce_hook(state, bucket):
-    t0 = time.perf_counter()
     buf = bucket.buffer()
     nbytes = buf.numel() * buf.element_size()
+    use_events = buf.is_cuda
+    if use_events:
+        state.timing = "cuda_events"
+        start = torch.cuda.Event(enable_timing=True)
+        start.record()                 # compute stream: gradients of this bucket are ready here
+    else:
+        state.timing = "callback"
+        t0 = time.perf_counter()
     with state.lock:
-        if state.inflight == 0:
+        if not use_events and state.inflight == 0:
             state.span_start = t0
         state.inflight += 1
         state.reduced_bytes += nbytes
@@ -186,24 +242,64 @@ def allreduce_hook(state, bucket):
     fut = dist.all_reduce(buf, async_op=True).get_future()
 
     def done(f):
-        now = time.perf_counter()
-        with state.lock:
-            state.bucket_sum_s += now - t0
-            state.inflight -= 1
-            if state.inflight == 0:
-                state.total_s += now - state.span_start
+        if use_events:
+            end = torch.cuda.Event(enable_timing=True)
+            end.record()               # callback stream is ordered after the NCCL work
+            with state.lock:
+                state.pending.append((start, end))
+                state.inflight -= 1
+        else:
+            now = time.perf_counter()
+            with state.lock:
+                state.bucket_sum_s += now - t0
+                state.inflight -= 1
+                if state.inflight == 0:
+                    state.total_s += now - state.span_start
         return f.value()[0]
 
     return fut.then(done)
+
+
+def probe_allreduce(world_size, grad_bytes, probe_mib, chunk_mib=25, max_passes=8):
+    """Blocking all-reduce timing: passes over probe_mib MiB, issued as DDP-bucket-
+    sized chunks and closed with torch.cuda.synchronize(). Independent of the hook,
+    so it validates the hook's timing in the same run. Every rank must call it.
+    The first passes are slow (communicator and staging-buffer setup), so passes
+    repeat until the last three agree within 15 % (at most max_passes) and the
+    median of those three is reported. Returns (seconds per pass, bytes per pass)
+    or None."""
+    if world_size < 2 or probe_mib <= 0 or not torch.cuda.is_available():
+        return None
+    nbytes = min(int(probe_mib) * 2**20, int(grad_bytes) or int(probe_mib) * 2**20)
+    buf = torch.zeros(nbytes // 4, dtype=torch.float32, device="cuda")
+    chunks = buf.split(max(1, (chunk_mib * 2**20) // 4))
+    times = []
+    for i in range(max_passes):
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        works = [dist.all_reduce(c, async_op=True) for c in chunks]
+        for w in works:
+            w.wait()
+        torch.cuda.synchronize()
+        times.append(time.perf_counter() - t0)
+        if i >= 3:
+            last = sorted(times[-3:])
+            if last[2] - last[0] <= 0.15 * last[1]:
+                break
+    del buf, chunks
+    torch.cuda.empty_cache()
+    return sorted(times[-3:])[1], nbytes
 
 
 class TransferProfileCallback(TrainerCallback):
     """Collects the transfer profile during trainer.train(); write it with
     finalize() after the final model save so checkpoint bytes are included."""
 
-    def __init__(self, trainer, warmup_steps):
+    def __init__(self, trainer, warmup_steps, probe_mib=256):
         self.trainer = trainer
         self.warmup = warmup_steps
+        self.probe_mib = probe_mib
+        self.probe = None               # (seconds per pass, bytes per pass)
         self.comm = CommState(1)
         self.world_size = 1
         self.use_cuda = False
@@ -262,6 +358,10 @@ class TransferProfileCallback(TrainerCallback):
             wrapped.register_comm_hook(self.comm, allreduce_hook)
             self.hook_installed = True
         self._install_fetch_timer()
+        try:
+            self.probe = probe_allreduce(self.world_size, self.grad_size_bytes, self.probe_mib)
+        except Exception as exc:       # the probe must never break training
+            logger.warning(f"all-reduce probe failed: {exc}")
         self.recording = self.warmup == 0
         self.last_step_end = time.perf_counter()
 
@@ -269,10 +369,13 @@ class TransferProfileCallback(TrainerCallback):
         now = time.perf_counter()
         if state.global_step == self.warmup and self.train_start is None:
             self._sync()
-            self.comm.reset()
+            self.comm.reset()          # drops warm-up events and byte counts too
             self.io0 = read_tree_io()
             self.train_start = self.last_step_end  # this step's batches were fetched after that
         self.recording = state.global_step >= self.warmup
+        if self.use_cuda and self.hook_installed:
+            self.comm.step_ref = torch.cuda.Event(enable_timing=True)
+            self.comm.step_ref.record()
         if not self.loader_timed and self.recording:
             self.dataload_total += now - self.last_step_end  # fallback: inter-step gap
         self.in_step = True
@@ -281,6 +384,7 @@ class TransferProfileCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         self._sync()
+        self.comm.flush_events()       # all events of this step are complete after the sync
         now = time.perf_counter()
         if self.recording:
             # compute = step window minus any batch fetching inside it
@@ -302,13 +406,34 @@ class TransferProfileCallback(TrainerCallback):
         nfs_read_b = max(0, io1[0] - self.io0[0])
         nfs_write_b = max(0, io1[1] - self.io0[1])
         total_dataload_s = self.dataload_total
-        total_compute_s = sum(self.compute_times)
+        step_window_s = sum(self.compute_times)   # on_step_begin to on_step_end minus fetches; contains the AllReduce
+        # Exclusive compute: the step window minus the time communication was in flight. Communication overlaps
+        # the last micro-batch's backward only, so with gradient accumulation this lower bound is tight.
+        total_compute_s = max(0.0, step_window_s - self.comm.total_s)
         samples_per_step = args.per_device_train_batch_size * args.gradient_accumulation_steps * self.world_size
         total_samples = steps * samples_per_step
         wire_bytes = int(round(self.comm.wire_bytes))
         frac = lambda x: x / total_s if total_s > 0 else 0.0
         reduced_per_step = self.comm.reduced_bytes / steps if steps else 0
         hook_coverage = reduced_per_step / self.grad_size_bytes if (self.hook_installed and self.grad_size_bytes) else None
+
+        ar_per_step = self.comm.total_s / steps if steps else 0.0
+        probe_s = probe_bw = expected_s = ratio = None
+        check = "not_applicable" if self.world_size < 2 else "no_probe"
+        if self.probe:
+            probe_s, probe_bytes = self.probe
+            probe_bw = probe_bytes * self.comm.wire_factor / 1e6 / probe_s if probe_s > 0 else None
+            expected_s = probe_s * (self.grad_size_bytes / probe_bytes) if probe_bytes else None
+            if expected_s and steps:
+                ratio = ar_per_step / expected_s
+                check = "ok" if 0.5 <= ratio <= 2.0 else "suspect"
+                if check == "suspect":
+                    logger.warning(
+                        f"AllReduce timing suspect: hook says {ar_per_step:.3f} s/step, the blocking probe implies "
+                        f"{expected_s:.3f} s/step (ratio {ratio:.2f}). Do not use the AllReduce fraction of this run."
+                    )
+        if self.comm.events_dropped:
+            logger.warning(f"{self.comm.events_dropped} AllReduce events had no end event and were dropped")
 
         profile = {
             "model": self.trainer.model.config._name_or_path if hasattr(self.trainer.model, "config") else "",
@@ -328,6 +453,8 @@ class TransferProfileCallback(TrainerCallback):
             "total_samples": total_samples,
             "avg_step_s": total_s / steps if steps else 0.0,
             "avg_compute_s": total_compute_s / steps if steps else 0.0,
+            "avg_step_window_s": step_window_s / steps if steps else 0.0,
+            "compute_excludes_allreduce": True,   # v2.5.0 and older: compute_fraction was the whole step window
             "avg_dataload_s": total_dataload_s / steps if steps else 0.0,
             "total_allreduce_s": self.comm.total_s,
             "allreduce_bucket_sum_s": self.comm.bucket_sum_s,
@@ -342,6 +469,14 @@ class TransferProfileCallback(TrainerCallback):
             "nfs_read_bytes": nfs_read_b,
             "nfs_write_bytes": nfs_write_b,
             "checkpoint_size_bytes": dir_size_bytes(output_dir),
+
+            "allreduce_timing": self.comm.timing,
+            "allreduce_events_dropped": self.comm.events_dropped,
+            "allreduce_probe_s": probe_s,
+            "allreduce_probe_bandwidth_MBs": probe_bw,
+            "allreduce_expected_s_per_step": expected_s,
+            "allreduce_vs_probe_ratio": ratio,
+            "allreduce_timing_check": check,
 
             "allreduce_bandwidth_MBs": (wire_bytes / 1e6) / self.comm.total_s if self.comm.total_s > 0 else 0.0,
             "nfs_read_bandwidth_MBs": (nfs_read_b / 1e6) / total_dataload_s if total_dataload_s > 0 else 0.0,
@@ -359,6 +494,11 @@ class ProfileArguments:
     profile_warmup_steps: int = field(
         default=5,
         metadata={"help": "Optimizer steps excluded from the transfer profile (CUDA init, autotune, allocator growth)."},
+    )
+    profile_probe_mib: int = field(
+        default=256,
+        metadata={"help": "MiB all-reduced (blocking, a few passes) at train start of multi-node runs to cross-check the "
+                          "hook's AllReduce timing. Adds about 3 s to the run. 0 disables."},
     )
     disable_transfer_profile: bool = field(
         default=False,
@@ -502,6 +642,14 @@ class DataArguments:
         default="Below is an instruction that describes a task. Write a response that appropriately completes the "
                 "request.",
         metadata={"help": "The prompt string to use with an instruction that does not include an input/context string."}
+    )
+    pack_text: bool = field(
+        default=False,
+        metadata={
+            "help": "Text mode only: tokenise every document, close it with EOS, concatenate the stream and cut it "
+                    "into max_seq_length blocks, so every sample has max_seq_length real tokens (as the synthetic "
+                    "rows do). Without it each row is truncated and padded per batch, and samples differ in length."
+        }
     )
     synthetic_samples: int = field(
         default=0,
@@ -847,14 +995,33 @@ def main():
             results["labels"] = copy.deepcopy(results["input_ids"])
             return results
 
+        def preprocess_text_packed(examples):
+            # Tokenise each document, close it with EOS, then cut the stream into full blocks.
+            # The remainder of each map batch (< max_seq_length tokens) is dropped.
+            docs = tokenizer(examples["text"], add_special_tokens=False)["input_ids"]
+            stream = []
+            for doc in docs:
+                stream.extend(doc + [tokenizer.eos_token_id])
+            block = data_args.max_seq_length
+            usable = (len(stream) // block) * block
+            blocks = [stream[i:i + block] for i in range(0, usable, block)]
+            return {
+                "input_ids": blocks,
+                "attention_mask": [[1] * block for _ in blocks],
+                "labels": [list(b) for b in blocks],
+            }
+
         with training_args.main_process_first(desc="text dataset map pre-processing"):
             raw_datasets = raw_datasets.filter(
                 lambda ex: ex["text"].strip() != "", load_from_cache_file=not data_args.overwrite_cache,
             )
             tokenized_datasets = raw_datasets.map(
-                preprocess_text, batched=True, remove_columns=raw_datasets["train"].column_names,
+                preprocess_text_packed if data_args.pack_text else preprocess_text,
+                batched=True, remove_columns=raw_datasets["train"].column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
             )
+        logger.info(f"Text mode: pack_text={data_args.pack_text}, max_seq_length={data_args.max_seq_length}, "
+                    f"train rows {len(tokenized_datasets['train'])}")
 
     # Get prompt strings from the user provided arguments
     prompt_dict = CHAT_PROMPT_DICT if "chat" in model_args.model_name_or_path else STANDARD_PROMPT_DICT
@@ -998,7 +1165,7 @@ def main():
 
         profiler = None
         if not profile_args.disable_transfer_profile:
-            profiler = TransferProfileCallback(trainer, profile_args.profile_warmup_steps)
+            profiler = TransferProfileCallback(trainer, profile_args.profile_warmup_steps, profile_args.profile_probe_mib)
             trainer.add_callback(profiler)
 
         training_start = datetime.now()

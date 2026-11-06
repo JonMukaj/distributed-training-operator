@@ -1,0 +1,141 @@
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"training.distributedtraining.io/v1","kind":"DistributedTraining","metadata":{"annotations":{},"labels":{"experiment":"e1-n1","series":"e1"},"name":"e1-n1-pythia410m","namespace":"default"},"spec":{"backend":"pytorch","dataset":{"name":"synthetic","split":"train"},"hardware":{"machineType":"n3-L40x1","nodePoolName":"dj-e1-n1","type":"gpu"},"model":{"name":"EleutherAI/pythia-410m","trainingScript":"/workspace/scripts/finetune.py"},"optimization":{"lora":{"enabled":false},"mixedPrecision":"bf16"},"outputPVCName":"distributed-training-output-pvc","pytorchSpec":{"command":["torchrun","--nproc_per_node=1","--nnodes=$(WORLD_SIZE)","--node_rank=$(RANK)","--master_addr=$(MASTER_ADDR)","--master_port=23456","/workspace/scripts/finetune.py","--model_name_or_path=EleutherAI/pythia-410m","--output_dir=/mnt/output/checkpoints","--dataset_name=synthetic","--synthetic_samples=50000","--synthetic_seq_len=512","--validation_split_percentage=0.2","--max_train_samples=40000","--max_eval_samples=1000","--use_lora=false","--per_device_train_batch_size=4","--per_device_eval_batch_size=8","--learning_rate=2e-5","--num_train_epochs=1","--max_steps=-1","--gradient_accumulation_steps=64","--max_grad_norm=1.0","--warmup_ratio=0.1","--logging_steps=5","--save_strategy=no","--overwrite_output_dir=True","--do_train=True","--do_eval=True","--bf16=True","--ddp_backend=nccl","--ddp_find_unused_parameters=False","--dataloader_num_workers=2","--report_to=none","--profile_warmup_steps=3"],"env":[{"name":"HF_HOME","value":"/mnt/output/hf-cache"},{"name":"HF_HUB_DISABLE_XET","value":"1"},{"name":"NCCL_DEBUG","value":"WARN"}],"image":"jmukaj/gpu-fine-tuner-hf:v2.6.0","resources":{"limits":{"cpu":"8","memory":"24Gi","nvidia.com/gpu":"1"},"requests":{"cpu":"8","memory":"24Gi"}}},"topology":{"nodes":1,"processesPerNode":1},"training":{"batchSize":4,"ddpBackend":"nccl","epochs":1,"gradAccumulationSteps":64,"learningRate":"2e-5","maxSteps":-1}}}
+  creationTimestamp: "2026-11-06T07:22:23Z"
+  finalizers:
+  - training.distributedtraining.io/cleanup
+  generation: 1
+  labels:
+    experiment: e1-n1
+    series: e1
+  name: e1-n1-pythia410m
+  namespace: default
+  resourceVersion: "63616"
+  uid: 6081f98a-5500-497d-afbf-f2b51df6426c
+spec:
+  backend: pytorch
+  dataset:
+    name: synthetic
+    split: train
+  hardware:
+    gpuCount: 1
+    machineType: n3-L40x1
+    nodePoolName: dj-e1-n1
+    type: gpu
+  model:
+    cacheDir: /mnt/output/hf-cache
+    name: EleutherAI/pythia-410m
+    trainingScript: /workspace/scripts/finetune.py
+  optimization:
+    lora:
+      alpha: 8
+      dropout: "0.1"
+      enabled: false
+      rank: 4
+    mixedPrecision: bf16
+  outputPVCName: distributed-training-output-pvc
+  pytorchSpec:
+    command:
+    - torchrun
+    - --nproc_per_node=1
+    - --nnodes=$(WORLD_SIZE)
+    - --node_rank=$(RANK)
+    - --master_addr=$(MASTER_ADDR)
+    - --master_port=23456
+    - /workspace/scripts/finetune.py
+    - --model_name_or_path=EleutherAI/pythia-410m
+    - --output_dir=/mnt/output/checkpoints
+    - --dataset_name=synthetic
+    - --synthetic_samples=50000
+    - --synthetic_seq_len=512
+    - --validation_split_percentage=0.2
+    - --max_train_samples=40000
+    - --max_eval_samples=1000
+    - --use_lora=false
+    - --per_device_train_batch_size=4
+    - --per_device_eval_batch_size=8
+    - --learning_rate=2e-5
+    - --num_train_epochs=1
+    - --max_steps=-1
+    - --gradient_accumulation_steps=64
+    - --max_grad_norm=1.0
+    - --warmup_ratio=0.1
+    - --logging_steps=5
+    - --save_strategy=no
+    - --overwrite_output_dir=True
+    - --do_train=True
+    - --do_eval=True
+    - --bf16=True
+    - --ddp_backend=nccl
+    - --ddp_find_unused_parameters=False
+    - --dataloader_num_workers=2
+    - --report_to=none
+    - --profile_warmup_steps=3
+    env:
+    - name: HF_HOME
+      value: /mnt/output/hf-cache
+    - name: HF_HUB_DISABLE_XET
+      value: "1"
+    - name: NCCL_DEBUG
+      value: WARN
+    image: jmukaj/gpu-fine-tuner-hf:v2.6.0
+    masterReplicas: 1
+    resources:
+      limits:
+        cpu: "8"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+      requests:
+        cpu: "8"
+        memory: 24Gi
+  restartPolicy: Never
+  topology:
+    nodes: 1
+    processesPerNode: 1
+  training:
+    batchSize: 4
+    ddpBackend: nccl
+    epochs: 1
+    gradAccumulationSteps: 64
+    learningRate: "2e-5"
+    loggingSteps: 10
+    maxSteps: -1
+    saveStrategy: epoch
+    saveTotalLimit: 2
+    validationSplit: "0.2"
+    warmupSteps: 0
+status:
+  finishTime: "2026-11-06T07:44:13Z"
+  gkeOperationID: delete:1531
+  jobName: pj-e1-n1-pythia410m
+  message: job complete — 16 metrics collected
+  phase: Succeeded
+  provisioningStartTime: "2026-11-06T07:22:43Z"
+  results:
+    bottleneck: compute-bound
+    collectionTime: 6s
+    estimatedCostUSD: "0.3158"
+    metrics:
+      allreduceBandwidthMBs: "0.0000"
+      allreduceFraction: "0.000000"
+      checkpointSizeBytes: "1624947236"
+      computeFraction: "0.972166"
+      dataloadFraction: "0.027611"
+      gradSizeBytes: "1621336064"
+      loss: "10.8144"
+      nfsReadBandwidthMBs: "0.0387"
+      nfsReadBytes: "798720"
+      nfsWriteBandwidthMBs: "2.1764"
+      nfsWriteBytes: "1624961024"
+      perplexity: "49734.0703"
+      samplesPerSecond: "52.4900"
+      totalAllreduceBytes: "0"
+      totalAllreduceSeconds: "0.0000"
+      totalSamples: "40000"
+    provisioningTime: 5m43s
+    trainingTime: 13m14s
+  startTime: "2026-11-06T07:22:23Z"
+  trainingStartTime: "2026-11-06T07:30:28Z"
