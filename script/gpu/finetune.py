@@ -74,11 +74,6 @@ class CustomPrinterCallback(TrainerCallback):
                 print(CNVRG_LINE_FORMAT.format('epoch', str(logs['epoch'])))
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# Data-transfer profiling: where does training time and data go
-# across the two transfer boundaries — gradient AllReduce (network) and dataset
-# loading (NFS/storage)?  
-#
 # Measurement notes
 #  * Step timers are closed with torch.cuda.synchronize() on GPU; CUDA is async and
 #    without it the fractions would measure kernel-launch time.
@@ -95,10 +90,6 @@ class CustomPrinterCallback(TrainerCallback):
 #    Summing per-bucket durations double-counts overlapping buckets. DDP overlaps
 #    communication with the backward pass, so this is an UPPER BOUND on exclusive
 #    comm time.
-#  * Cross-check: at train start every multi-node run times a few blocking
-#    all-reduces of --profile_probe_mib MiB (chunked like DDP buckets, repeated until stable) and reports
-#    allreduce_probe_*; allreduce_timing_check says whether the hook's per-step
-#    time is consistent with it (ratio inside [0.5, 2.0]).
 #  * Bytes: total_reduced_bytes is what the hook observed; per step it must equal
 #    grad_size_bytes (= bytes of all parameters with requires_grad — only the
 #    adapters under LoRA, every parameter in full fine-tuning). That equality is
@@ -454,7 +445,7 @@ class TransferProfileCallback(TrainerCallback):
             "avg_step_s": total_s / steps if steps else 0.0,
             "avg_compute_s": total_compute_s / steps if steps else 0.0,
             "avg_step_window_s": step_window_s / steps if steps else 0.0,
-            "compute_excludes_allreduce": True,   # v2.5.0 and older: compute_fraction was the whole step window
+            "compute_excludes_allreduce": True,
             "avg_dataload_s": total_dataload_s / steps if steps else 0.0,
             "total_allreduce_s": self.comm.total_s,
             "allreduce_bucket_sum_s": self.comm.bucket_sum_s,

@@ -1,17 +1,6 @@
 # ---------------------------------------------------------------------------
-# GPU LLM fine-tuning — Hyperstack, ephemeral L40 node group (A100 as alternative)
-# Step-by-step run sequence: README → "Step 7 — Run the GPU fine-tuning sample"
-# in the Hyperstack section.
-#
-# GPU counterpart of Example 2 in training_v1_distributedtraining.yaml. Same
-# workload as the Helm chart used for the manual GPU runs (smol_llama-101M-GQA,
-# medical_meadow flashcards, LoRA, bf16). Image jmukaj/gpu-fine-tuner-hf:v2.6.0 is
-# built from script/gpu/Dockerfile (split CUDA layers, largest 1.7 GB) and carries
-# the instrumented finetune.py with batch-fetch-timed data-load (exact under
-# gradient accumulation), so every run also writes transfer_profile.json.
-# History: v2.6.0 compute fraction excludes AllReduce (v2.5.0 reported the whole step window, so the operator called communication-bound runs compute-bound); v2.5.0 AllReduce timed with CUDA events + in-run probe (v2.3/v2.4 reported ~0 AllReduce on NCCL: callback timestamps measure enqueue); v2.4.0 packed 512-token text blocks (--pack_text); v2.3.0 DataLoader-timed profiler; v2.2.0 split layers, step-gap data-load timing; v2.1.0 single 5.8 GB
-# base layer (2–3 pull attempts per node); v2.0.0 12 GB devel base; v1.0.0 original script.
-#
+# GPU LLM fine-tuning  on Hyperstack, ephemeral L40 node group.
+
 # Hyperstack specifics:
 #   * hardware.machineType is a Hyperstack FLAVOR name
 #     (https://docs.hyperstack.cloud/docs/hardware/flavors/), region CANADA-1:
@@ -30,27 +19,13 @@
 #     --hyperstack-nodepool-label flag's key. If that label is wrong for your
 #     cluster the pods stay Pending — see README Step 4 (node label).
 #
-# pytorchSpec.command is NOT set — the operator builds the torchrun invocation
-# from model/dataset/training/optimization (hardware.type=gpu → --no_cuda=False,
-# default --ddp_backend=nccl, nvidia.com/gpu toleration).
 #
 # The PVC is mounted at /mnt/output in every replica:
 #   /mnt/output/checkpoints        — --output_dir (all_results.json, transfer_profile.json)
 #   /mnt/output/hf-cache           — model/tokenizer cache (HF_HOME env below)
 #   /mnt/output/hf-cache/datasets  — tokenised dataset cache (dataset.cacheDirectory)
 #
-# Prerequisites (README Hyperstack section, Steps 1–6):
-#   1. Hyperstack CSI driver, NFS server, NFS CSI driver and the shared PVC (from operator/):
-#        kubectl apply -f ../example/infra/demo/nfs-hyperstack.yaml
-#        helm install csi-driver-nfs csi-driver-nfs/csi-driver-nfs -n kube-system
-#        kubectl apply -f config/samples/pvc-nfs-csi.yaml   # not pvc.yaml: nodes have no NFS client
-#   2. Kubeflow training-operator installed (PyTorchJob CRD).
-#   3. Operator deployed with config/overlays/hyperstack (cluster ID, API key).
-#   4. Hourly price of the flavor in the machine-costs ConfigMap — needed only
-#      for objective mode (see the bottom of this file).
-#   5. HF token secret — only for gated models (not needed for smol_llama):
-#        kubectl create secret generic hf-token-secret --from-literal=token=<hf_...>
-#      Never commit the token itself (the Helm values file carries it base64-encoded).
+
 #
 # THIS FILE HOLDS SEVERAL CRs. Every CR carries an `experiment` label; apply ONE
 # at a time with a label selector — a bare `kubectl apply -f` would start every
@@ -59,7 +34,7 @@
 #   kubectl apply -f config/samples/training_v1_distributedtraining_hyperstack_gpu.yaml -l experiment=lora-cal
 #   make run-experiment EXP=e1-n2            # same thing, from operator/
 #
-# Experiments in this file (thesis Ch 5 / Ch 6):
+# Experiments in this file:
 #   lora-cal   smol_llama-101M LoRA, 1 node (change nodes/name for 2)   — Ch 5 calibration
 #   (objective block, commented)                                        — Ch 5 solver
 #   e1-n1 / e1-n2 / e1-n5 / e1-n7 / e1-n10   Pythia-410M full fine-tune, synthetic data  — Ch 6 E1
@@ -144,11 +119,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
-      # NCCL_SOCKET_IFNAME is not pinned: the interface name on Hyperstack VMs
-      # differs from GKE's eth0; NCCL autodetects. Set it only if multi-node
-      # NCCL init fails (check `ip -br link` inside a pod).
-      # LD_PRELOAD (tcmalloc/iomp) from the Intel CPU image is not needed here.
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # Objective mode — same workload, solver picks the node count
@@ -229,18 +200,8 @@ spec:
 # config hash that groups the E1 runs (1/2/5/7/10 nodes) into one history series,
 # distinct from the other series. Keep them identical across the three CRs.
 #
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
+
+
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -254,7 +215,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e1-n1             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e1-n1
   topology:
     nodes: 1
     processesPerNode: 1
@@ -292,7 +253,7 @@ spec:
       - --synthetic_samples=50000          # fixed total work; identical at 1/2/5/7/10 nodes
       - --synthetic_seq_len=512
       - --validation_split_percentage=0.2
-      - --max_train_samples=40000
+      - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
       - --per_device_train_batch_size=4
@@ -300,7 +261,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -313,8 +274,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -328,29 +289,11 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e1-n2: Pythia-410M FULL fine-tuning, 2 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
 #
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E1 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -364,7 +307,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e1-n2             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e1-n2
   topology:
     nodes: 2
     processesPerNode: 1
@@ -402,7 +345,7 @@ spec:
       - --synthetic_samples=50000          # fixed total work; identical at 1/2/5/7/10 nodes
       - --synthetic_seq_len=512
       - --validation_split_percentage=0.2
-      - --max_train_samples=40000
+      - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
       - --per_device_train_batch_size=4
@@ -410,7 +353,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -423,8 +366,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -438,29 +381,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e1-n5: Pythia-410M FULL fine-tuning, 5 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E1 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -474,7 +398,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e1-n5             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e1-n5
   topology:
     nodes: 5
     processesPerNode: 1
@@ -512,7 +436,7 @@ spec:
       - --synthetic_samples=50000          # fixed total work; identical at 1/2/5/7/10 nodes
       - --synthetic_seq_len=512
       - --validation_split_percentage=0.2
-      - --max_train_samples=40000
+      - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
       - --per_device_train_batch_size=4
@@ -520,7 +444,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -533,8 +457,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -548,29 +472,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e1-n7: Pythia-410M FULL fine-tuning, 7 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E1 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -584,7 +489,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e1-n7             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e1-n7
   topology:
     nodes: 7
     processesPerNode: 1
@@ -622,7 +527,7 @@ spec:
       - --synthetic_samples=50000          # fixed total work; identical at 1/2/5/7/10 nodes
       - --synthetic_seq_len=512
       - --validation_split_percentage=0.2
-      - --max_train_samples=40000
+      - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
       - --per_device_train_batch_size=4
@@ -630,7 +535,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -643,8 +548,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -658,29 +563,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e1-n10: Pythia-410M FULL fine-tuning, 10 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E1 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -694,7 +580,8 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e1-n10             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e1-n10
+
   topology:
     nodes: 10
     processesPerNode: 1
@@ -732,7 +619,7 @@ spec:
       - --synthetic_samples=50000          # fixed total work; identical at 1/2/5/7/10 nodes
       - --synthetic_seq_len=512
       - --validation_split_percentage=0.2
-      - --max_train_samples=40000
+      - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
       - --per_device_train_batch_size=4
@@ -768,7 +655,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e2-n1: Pythia-410M FULL fine-tuning, 1 node — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
@@ -843,7 +730,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -852,7 +739,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -865,8 +752,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -880,29 +767,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e2-n2: Pythia-410M FULL fine-tuning, 2 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E2 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase, and data-bound pressure from NFS.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -916,7 +784,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e2-n2             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e2-n2
   topology:
     nodes: 2
     processesPerNode: 1
@@ -955,7 +823,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -964,7 +832,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -977,8 +845,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -992,29 +860,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e2-n5: Pythia-410M FULL fine-tuning, 5 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E2 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase, and data-bound pressure from NFS.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -1028,7 +877,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e2-n5             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e2-n5
   topology:
     nodes: 5
     processesPerNode: 1
@@ -1067,7 +916,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1076,7 +925,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1089,8 +938,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -1104,29 +953,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e2-n7: Pythia-410M FULL fine-tuning, 7 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E2 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase, and data-bound pressure from NFS.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -1140,7 +970,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e2-n7             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e2-n7
   topology:
     nodes: 7
     processesPerNode: 1
@@ -1179,7 +1009,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1188,7 +1018,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1201,8 +1031,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -1216,29 +1046,10 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # e2-n10: Pythia-410M FULL fine-tuning, 10 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
-#
-# pytorchSpec.command is set because the operator's default torchrun builder
-# cannot express --use_lora false, --synthetic_samples or a dataset config name.
-# The spec.model/dataset/training fields are still filled in: they form the
-# config hash that groups the E2 runs (1/2/5/7/10 nodes) into one history series,
-# distinct from the other series. Keep them identical across the three CRs.
-#
-# Why full fine-tuning: under LoRA only ~61k adapter params are reduced (368 kB
-# per step) and AllReduce is ~0.4% of the step; with all 405M params in fp32
-# master weights the gradient is ~1.6 GB per step, which is the communication
-# cost the thesis measures. Expect `bottleneck` to move from compute-bound
-# toward communication-bound as nodes increase, and data-bound pressure from NFS.
-# Gradient accumulation 64 (effective batch 256): measured 2026-11-05 without it, a
-# 1.6 GB AllReduce per 4-sample micro-batch on this ~3 Gbit/s interconnect made 4
-# nodes 45x slower per step than 1 (eta 0.02, alpha ~14) — one finding repeated four
-# times, hours per run. With 64 micro-batches per optimizer step the per-node
-# compute (~7 s) is comparable to the AllReduce (~4 s at 2 nodes, ~6 s at 4), so eta
-# spans a range the solver and the bottleneck classifier can actually discriminate.
-# Same 40k samples per run; ~18 min of compute at 1 node.
 # ---------------------------------------------------------------------------
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTraining
@@ -1252,7 +1063,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e2-n10             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e2-n10
   topology:
     nodes: 10
     processesPerNode: 1
@@ -1291,7 +1102,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1300,7 +1111,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1313,8 +1124,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -1328,7 +1139,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run A: two-point fit, held-out node count
@@ -1357,7 +1168,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-oe2-2pt          # ≤ 20 chars, unique per CR
+    nodePoolName: dj-oe2-2pt
   objective:                         # no explicit topology: the solver resolves it
     targetTime: "17m"   # PROVISIONAL - set with script/solver_whatif.py, see header
     maxNodes: 10
@@ -1396,7 +1207,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1405,7 +1216,7 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1418,8 +1229,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -1433,7 +1244,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run B: three-point fit, tight target
@@ -1460,7 +1271,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-oe2-tight          # ≤ 20 chars, unique per CR
+    nodePoolName: dj-oe2-tight
   objective:                         # no explicit topology: the solver resolves it
     targetTime: "10m"   # PROVISIONAL - set with script/solver_whatif.py, see header
     maxNodes: 10
@@ -1499,7 +1310,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1508,9 +1319,9 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
-      - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
+      - --warmup_ratio=0.1
       - --logging_steps=5
       - --save_strategy=no
       - --overwrite_output_dir=True
@@ -1521,7 +1332,7 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
+      - --profile_warmup_steps=3
     resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
       requests:
         cpu: "8"
@@ -1536,7 +1347,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run C: three-point fit, intermediate target
@@ -1561,7 +1372,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-oe2-mid          # ≤ 20 chars, unique per CR
+    nodePoolName: dj-oe2-mid
   objective:                         # no explicit topology: the solver resolves it
     targetTime: "12m"   # PROVISIONAL - set with script/solver_whatif.py, see header
     maxNodes: 10
@@ -1600,7 +1411,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1609,9 +1420,9 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
-      - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
+      - --warmup_ratio=0.1
       - --logging_steps=5
       - --save_strategy=no
       - --overwrite_output_dir=True
@@ -1637,7 +1448,7 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - repeat of e2-n2 (run-to-run variance)
@@ -1658,7 +1469,7 @@ spec:
   hardware:
     type: gpu
     machineType: n3-L40x1
-    nodePoolName: dj-e2-n2-rep             # ≤ 20 chars, unique per CR
+    nodePoolName: dj-e2-n2-rep
   topology:
     nodes: 2
     processesPerNode: 1
@@ -1697,7 +1508,7 @@ spec:
       - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512   # tokenised cache on the PVC
       - --pack_text=true
       - --max_seq_length=512
-      - --max_train_samples=40000          # fixed total work; identical at 1/2/5/7/10 nodes
+      - --max_train_samples=35840          # fixed total work; identical at 1/2/5/7/10 nodes
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
@@ -1706,9 +1517,9 @@ spec:
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=64
       - --max_grad_norm=1.0
-      - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
+      - --warmup_ratio=0.1
       - --logging_steps=5
       - --save_strategy=no
       - --overwrite_output_dir=True
@@ -1719,8 +1530,8 @@ spec:
       - --ddp_find_unused_parameters=False   # Pythia uses every parameter each step; the Trainer's default True adds a graph walk per iteration
       - --dataloader_num_workers=2
       - --report_to=none
-      - --profile_warmup_steps=3           # each optimizer step is 64 micro-batches (~7 s); 3 is ample CUDA warm-up
-    resources:                   # n3-L40x1: 28 vCPU / 58 GB; 405M full FT needs ~7 GB GPU + activations
+      - --profile_warmup_steps=3
+    resources:
       requests:
         cpu: "8"
         memory: "24Gi"
@@ -1734,4 +1545,4 @@ spec:
       - name: HF_HUB_DISABLE_XET
         value: "1"
       - name: NCCL_DEBUG
-        value: WARN
+        value: INFO

@@ -1,6 +1,4 @@
-# Training image for the instrumented finetune.py and pretokenize.py.
-
-# Build & push (from script/gpu/):
+# Build & push
 #   docker build -t jmukaj/gpu-fine-tuner-hf:<tag> .
 #   docker push jmukaj/gpu-fine-tuner-hf:<tag>
 FROM python:3.11-slim-bookworm
