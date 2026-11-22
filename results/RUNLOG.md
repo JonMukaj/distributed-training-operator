@@ -5,8 +5,5 @@ put anomalies in `results/<RUN>/notes.txt` and regenerate.
 
 | date | run | series | kind | n | provisioning | training | inner loop | samples/s (wall) | alpha (wall) | bottleneck | eval loss | cost $ | anomalies |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-11-03 | distributedtraining-llm-gpu-1 | lora | fixed | 1 | 7m24s | 5m27s | 2m00s | 83.1 | - | compute-bound | 1.529 | 0.21 |  |
-| 2026-11-03 | distributedtraining-llm-gpu-2 | lora | fixed | 2 | 8m04s | 3m36s | 1m48s | 125.8 | 0.321 | timer invalid | 1.551 | 0.39 | AUTO: AllReduce timer predates the CUDA-event fix |
-| 2026-11-03 | distributedtraining-llm-gpu-obj-3 | lora | objective | 2 | 7m04s | 3m33s | 1m50s | 127.5 | 0.303 | timer invalid | 1.551 | 0.35 | AUTO: AllReduce timer predates the CUDA-event fix |
-| 2026-11-06 | e1-n2 | e1 | fixed | 2 | 7m24s | 12m51s | 11m17s | 51.9 | 0.942 | communication-bound | 10.823 | 0.68 |  |
-| 2026-11-06 | e1-n1 | e1 | fixed | 1 | 5m43s | 13m14s | 12m42s | 50.4 | - | compute-bound | 10.814 | 0.32 |  |
+| 2026-11-21 | e1-n1 | e1 | fixed | 1 | 5m23s | 10m27s | 10m02s | 57.2 | - | compute-bound | 10.815 | 0.28 |  |
+| 2026-11-21 | e1-n2 | e1 | fixed | 2 | 9m45s | 9m29s | 8m12s | 63.0 | 0.815 | communication-bound | 10.825 | 0.69 |  |

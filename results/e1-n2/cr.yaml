@@ -3,8 +3,8 @@ kind: DistributedTraining
 metadata:
   annotations:
     kubectl.kubernetes.io/last-applied-configuration: |
-      {"apiVersion":"training.distributedtraining.io/v1","kind":"DistributedTraining","metadata":{"annotations":{},"labels":{"experiment":"e1-n2","series":"e1"},"name":"e1-n2-pythia410m","namespace":"default"},"spec":{"backend":"pytorch","dataset":{"name":"synthetic","split":"train"},"hardware":{"machineType":"n3-L40x1","nodePoolName":"dj-e1-n2","type":"gpu"},"model":{"name":"EleutherAI/pythia-410m","trainingScript":"/workspace/scripts/finetune.py"},"optimization":{"lora":{"enabled":false},"mixedPrecision":"bf16"},"outputPVCName":"distributed-training-output-pvc","pytorchSpec":{"command":["torchrun","--nproc_per_node=1","--nnodes=$(WORLD_SIZE)","--node_rank=$(RANK)","--master_addr=$(MASTER_ADDR)","--master_port=23456","/workspace/scripts/finetune.py","--model_name_or_path=EleutherAI/pythia-410m","--output_dir=/mnt/output/checkpoints","--dataset_name=synthetic","--synthetic_samples=50000","--synthetic_seq_len=512","--validation_split_percentage=0.2","--max_train_samples=40000","--max_eval_samples=1000","--use_lora=false","--per_device_train_batch_size=4","--per_device_eval_batch_size=8","--learning_rate=2e-5","--num_train_epochs=1","--max_steps=-1","--gradient_accumulation_steps=64","--max_grad_norm=1.0","--warmup_ratio=0.1","--logging_steps=5","--save_strategy=no","--overwrite_output_dir=True","--do_train=True","--do_eval=True","--bf16=True","--ddp_backend=nccl","--ddp_find_unused_parameters=False","--dataloader_num_workers=2","--report_to=none","--profile_warmup_steps=3"],"env":[{"name":"HF_HOME","value":"/mnt/output/hf-cache"},{"name":"HF_HUB_DISABLE_XET","value":"1"},{"name":"NCCL_DEBUG","value":"WARN"}],"image":"jmukaj/gpu-fine-tuner-hf:v2.6.0","resources":{"limits":{"cpu":"8","memory":"24Gi","nvidia.com/gpu":"1"},"requests":{"cpu":"8","memory":"24Gi"}}},"topology":{"nodes":2,"processesPerNode":1},"training":{"batchSize":4,"ddpBackend":"nccl","epochs":1,"gradAccumulationSteps":64,"learningRate":"2e-5","maxSteps":-1}}}
-  creationTimestamp: "2026-11-06T06:56:17Z"
+      {"apiVersion":"training.distributedtraining.io/v1","kind":"DistributedTraining","metadata":{"annotations":{},"labels":{"experiment":"e1-n2","series":"e1"},"name":"e1-n2-pythia410m","namespace":"default"},"spec":{"backend":"pytorch","dataset":{"name":"synthetic","split":"train"},"hardware":{"machineType":"n3-A100x1-spot","nodePoolName":"dj-e1-n2","type":"gpu"},"model":{"name":"EleutherAI/pythia-410m","trainingScript":"/workspace/scripts/finetune.py"},"optimization":{"lora":{"enabled":false},"mixedPrecision":"bf16"},"outputPVCName":"distributed-training-output-pvc","pytorchSpec":{"command":["torchrun","--nproc_per_node=1","--nnodes=$(WORLD_SIZE)","--node_rank=$(RANK)","--master_addr=$(MASTER_ADDR)","--master_port=23456","/workspace/scripts/finetune.py","--model_name_or_path=EleutherAI/pythia-410m","--output_dir=/mnt/output/checkpoints","--dataset_name=synthetic","--synthetic_samples=50000","--synthetic_seq_len=512","--validation_split_percentage=0.2","--max_train_samples=35840","--max_eval_samples=1000","--use_lora=false","--per_device_train_batch_size=4","--per_device_eval_batch_size=8","--learning_rate=2e-5","--num_train_epochs=1","--max_steps=-1","--gradient_accumulation_steps=64","--max_grad_norm=1.0","--warmup_ratio=0.1","--logging_steps=5","--save_strategy=no","--overwrite_output_dir=True","--do_train=True","--do_eval=True","--bf16=True","--ddp_backend=nccl","--ddp_find_unused_parameters=False","--dataloader_num_workers=2","--report_to=none","--profile_warmup_steps=3"],"env":[{"name":"HF_HOME","value":"/mnt/output/hf-cache"},{"name":"HF_HUB_DISABLE_XET","value":"1"},{"name":"NCCL_DEBUG","value":"INFO"},{"name":"NCCL_DEBUG_SUBSYS","value":"INIT,COLL"}],"image":"jmukaj/gpu-fine-tuner-hf:v2.6.0","resources":{"limits":{"cpu":"8","memory":"24Gi","nvidia.com/gpu":"1"},"requests":{"cpu":"8","memory":"24Gi"}}},"topology":{"nodes":2,"processesPerNode":1},"training":{"batchSize":4,"ddpBackend":"nccl","epochs":1,"gradAccumulationSteps":64,"learningRate":"2e-5","maxSteps":-1}}}
+  creationTimestamp: "2026-11-21T18:59:13Z"
   finalizers:
   - training.distributedtraining.io/cleanup
   generation: 1
@@ -13,8 +13,8 @@ metadata:
     series: e1
   name: e1-n2-pythia410m
   namespace: default
-  resourceVersion: "56664"
-  uid: 4b4f063a-2d69-48f4-b8b7-81d568ea2f40
+  resourceVersion: "26723"
+  uid: 874f3534-0454-45dc-ba02-e553ede5493a
 spec:
   backend: pytorch
   dataset:
@@ -22,7 +22,7 @@ spec:
     split: train
   hardware:
     gpuCount: 1
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot
     nodePoolName: dj-e1-n2
     type: gpu
   model:
@@ -52,7 +52,7 @@ spec:
     - --synthetic_samples=50000
     - --synthetic_seq_len=512
     - --validation_split_percentage=0.2
-    - --max_train_samples=40000
+    - --max_train_samples=35840
     - --max_eval_samples=1000
     - --use_lora=false
     - --per_device_train_batch_size=4
@@ -80,7 +80,9 @@ spec:
     - name: HF_HUB_DISABLE_XET
       value: "1"
     - name: NCCL_DEBUG
-      value: WARN
+      value: INFO
+    - name: NCCL_DEBUG_SUBSYS
+      value: INIT,COLL
     image: jmukaj/gpu-fine-tuner-hf:v2.6.0
     masterReplicas: 1
     resources:
@@ -108,34 +110,33 @@ spec:
     validationSplit: "0.2"
     warmupSteps: 0
 status:
-  finishTime: "2026-11-06T07:19:28Z"
-  gkeOperationID: delete:1530
+  finishTime: "2026-11-21T19:20:45Z"
+  gkeOperationID: delete:1576
   jobName: pj-e1-n2-pythia410m
   message: job complete — 16 metrics collected
   phase: Succeeded
-  provisioningStartTime: "2026-11-06T06:56:37Z"
+  provisioningStartTime: "2026-11-21T18:59:33Z"
   results:
     bottleneck: communication-bound
     collectionTime: 6s
-    estimatedCostUSD: "0.6750"
     metrics:
-      allreduceBandwidthMBs: "429.1543"
-      allreduceFraction: "0.444801"
-      checkpointSizeBytes: "3246317387"
-      computeFraction: "0.538951"
-      dataloadFraction: "0.016096"
+      allreduceBandwidthMBs: "598.9968"
+      allreduceFraction: "0.389236"
+      checkpointSizeBytes: "1624949408"
+      computeFraction: "0.596069"
+      dataloadFraction: "0.014453"
       gradSizeBytes: "1621336064"
-      loss: "10.8229"
-      nfsReadBandwidthMBs: "0.0769"
+      loss: "10.8251"
+      nfsReadBandwidthMBs: "0.1186"
       nfsReadBytes: "798720"
-      nfsWriteBandwidthMBs: "2.5173"
+      nfsWriteBandwidthMBs: "3.4876"
       nfsWriteBytes: "1624961024"
-      perplexity: "50156.9424"
-      samplesPerSecond: "59.0620"
-      totalAllreduceBytes: "123221540864"
-      totalAllreduceSeconds: "287.1264"
-      totalSamples: "40000"
-    provisioningTime: 7m24s
-    trainingTime: 12m51s
-  startTime: "2026-11-06T06:56:17Z"
-  trainingStartTime: "2026-11-06T07:05:52Z"
+      perplexity: "50265.9774"
+      samplesPerSecond: "72.7920"
+      totalAllreduceBytes: "108629516288"
+      totalAllreduceSeconds: "181.3524"
+      totalSamples: "35840"
+    provisioningTime: 9m45s
+    trainingTime: 9m29s
+  startTime: "2026-11-21T18:59:13Z"
+  trainingStartTime: "2026-11-21T19:10:29Z"

@@ -1,28 +1,28 @@
 apiVersion: training.distributedtraining.io/v1
 kind: DistributedTrainingHistory
 metadata:
-  creationTimestamp: "2026-11-06T07:19:28Z"
+  creationTimestamp: "2026-11-21T19:20:45Z"
   generateName: djh-e1-n2-pythia410m-
   generation: 1
   labels:
-    config-hash: 7574d1b69b18c5281ef6b9dced335deb278d4df460c449537a07d3bfc9ae61d
-  name: djh-e1-n2-pythia410m-wmxsj
+    config-hash: 0ca6df17792546330b354423c53cd5c1b5a34c834197554cec8b8075e99bd53
+  name: djh-e1-n2-pythia410m-h5zql
   namespace: default
-  resourceVersion: "56662"
-  uid: 0eac6866-ca57-45cb-978a-aa235bfe89d1
+  resourceVersion: "26720"
+  uid: bce1754d-1da7-410d-839d-69e7a3ac5a4f
 spec:
-  allReduceBandwidthMBs: "429.1543"
-  allReduceFraction: "0.444801"
+  allReduceBandwidthMBs: "598.9968"
+  allReduceFraction: "0.389236"
   backend: pytorch
-  computeFraction: "0.538951"
-  configHash: 7574d1b69b18c5281ef6b9dced335deb278d4df460c449537a07d3bfc9ae61d
-  dataloadFraction: "0.016096"
+  computeFraction: "0.596069"
+  configHash: 0ca6df17792546330b354423c53cd5c1b5a34c834197554cec8b8075e99bd53
+  dataloadFraction: "0.014453"
   gradSizeBytes: 1621336064
-  machineType: n3-L40x1
-  nfsReadBandwidthMBs: "0.0769"
+  machineType: n3-A100x1-spot
+  nfsReadBandwidthMBs: "0.1186"
   nodes: 2
-  provisioningSeconds: "444"
-  throughput: 51880674449n
-  totalAllReduceBytes: 123221540864
-  totalWork: 40k
-  trainingSeconds: "771"
+  provisioningSeconds: "585"
+  throughput: 62987697716n
+  totalAllReduceBytes: 108629516288
+  totalWork: "35840"
+  trainingSeconds: "569"

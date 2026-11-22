@@ -9,10 +9,8 @@
 #   4  Hyperstack overlay: cluster ID, namespace, API-key Secret
 #   5  CRDs, manifests, build/deploy the operator
 #
-# It stops before Step 7: no GPU node group is started, so nothing billable
-# runs for training. Start experiments with `make run-experiment EXP=...`.
 #
-# Usage (from anywhere):
+# Usage:
 #   export HYPERSTACK_API_KEY=...
 #   export GRAFANA_PASSWORD=...                # optional; default Grafana login is admin/admin
 #   [IMG=jmukaj/distributed-training-operator:<tag>] script/hyperstack-bootstrap.sh
@@ -24,8 +22,10 @@
 # Environment:
 #   HYPERSTACK_API_KEY      required; used by the operator, CSI driver and Terraform
 #   GRAFANA_PASSWORD        optional; unset = the Makefile default (admin)
-#   IMG                     image to build and push (needs `docker login`). Unset =
-#                           deploy the image already pinned in config/manager/kustomization.yaml
+#   IMG                     image to deploy. If the tag already exists on the registry it is
+#                           deployed without a rebuild; otherwise it is built and pushed (needs
+#                           `docker login`). Unset = deploy the image pinned in
+#                           config/manager/kustomization.yaml
 #   HYPERSTACK_GPU_FLAVOR   default n3-L40x1
 #   SKIP_MONITORING=1       skip Step 3b
 #   START_STEP=N            resume at step N (1-5, 3b is run with 3); each step is idempotent
@@ -57,9 +57,9 @@ die()  { printf '\n\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 # Example: START_STEP=4 skips steps 1-3 and 3b, and runs 4 and 5.
 want() { (( START_STEP <= $1 )); }
 
-# ---------------------------------------------------------------- preflight
-preflight() {
-  log "Preflight"
+# ---------------------------------------------------------------- prepare
+prepare() {
+  log "prepare"
   local tool
   for tool in terraform kubectl helm jq curl make go; do
     command -v "$tool" >/dev/null || die "missing tool: $tool"
@@ -73,7 +73,7 @@ preflight() {
   echo "ok (START_STEP=$START_STEP, GPU flavor=$GPU_FLAVOR, IMG=${IMG:-<pinned in config/manager>})"
 }
 
-# ---------------------------------------------------------------- step 1 + 2
+# step 1 + 2
 step_cluster() {
   if want 1; then
     log "Step 1: Terraform (cluster)"
@@ -97,7 +97,7 @@ step_cluster() {
   CLUSTER_ID="$cluster_id"
 }
 
-# ---------------------------------------------------------------- step 3
+# step 3
 step_dependencies() {
   want 3 || return 0
   export KUBECONFIG="$KUBECONFIG_FILE"
@@ -127,7 +127,7 @@ step_dependencies() {
   kubectl wait --for=condition=Available deployment/training-operator -n kubeflow --timeout=120s
 }
 
-# ---------------------------------------------------------------- step 3b
+# step 3b
 step_monitoring() {
   want 3 || return 0
   [[ "$SKIP_MONITORING" == "1" ]] && { log "Step 3b: skipped (SKIP_MONITORING=1)"; return 0; }
@@ -141,7 +141,7 @@ step_monitoring() {
   kubectl -n monitoring get pods
 }
 
-# ---------------------------------------------------------------- step 4 + 5
+# step 4 + 5
 step_operator() {
   export KUBECONFIG="$KUBECONFIG_FILE"
   cd "$OPERATOR_DIR"
@@ -157,7 +157,10 @@ step_operator() {
     make manifests generate
     make install
 
-    if [[ -n "$IMG" ]]; then
+    if [[ -n "$IMG" ]] && docker manifest inspect "$IMG" >/dev/null 2>&1; then
+      log "Step 5: $IMG already on the registry, deploying it without a rebuild"
+      make hs-deploy IMG="$IMG"
+    elif [[ -n "$IMG" ]]; then
       log "Step 5: build, push and deploy $IMG"
       make hs-build-deploy IMG="$IMG"
     else
@@ -167,8 +170,8 @@ step_operator() {
   fi
 }
 
-# ---------------------------------------------------------------- main
-preflight
+
+prepare
 step_cluster
 step_dependencies
 step_monitoring

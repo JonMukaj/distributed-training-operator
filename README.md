@@ -16,6 +16,7 @@ completes.
 - [Project Distribution](#project-distribution)
 - [Development and Deployment on GKE](#development-and-deployment-on-gke)
 - [Development and Deployment on Hyperstack](#development-and-deployment-on-hyperstack)
+  - [Bootstrap and experiment workflow](#bootstrap-and-experiment-workflow)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -592,6 +593,66 @@ This section covers the operator development workflow on a [Hyperstack](https://
 > It stops before Step 7, so no GPU node group is started. Every step is idempotent;
 > `START_STEP=<n>` resumes at a later step. The manual steps below remain the reference.
 
+### Bootstrap and experiment workflow
+
+This is the order in which the steps below fit together. Details are in the numbered steps,
+and the run matrix and checks are in [`EXPERIMENTS.md`](EXPERIMENTS.md).
+
+**1. Prepare**
+
+- Build and push the training image from `script/gpu/`, and check that the tag exists on the registry.
+- Pin the operator image in `operator/config/manager/kustomization.yaml`. The bootstrap script skips the
+  build when the tag already exists.
+- Export the credentials used by Terraform, the operator and Grafana: `HYPERSTACK_API_KEY` and, optionally, `GRAFANA_PASSWORD`.
+
+**2. Create the cluster and the operator**
+
+```sh
+IMG=<image:tag> script/hyperstack-bootstrap.sh
+```
+
+The script runs Steps 1 to 5 and 3b. It does not start any GPU node group. It exports `KUBECONFIG` only
+for itself, so point `kubectl` at the cluster in your shell:
+
+```sh
+cd example/infra/hyperstack
+terraform output -raw kubeconfig > kubeconfig.yaml
+export KUBECONFIG=$PWD/kubeconfig.yaml
+cd ../../../operator
+```
+
+**3. Run experiments**
+
+Each experiment is one CR, selected by its `experiment` label. Run them one at a time and archive each before the next:
+
+```sh
+make run-experiment EXP=<label>
+make hs-watch                                   # wait for Succeeded
+make hs-archive-results CR=<cr-name> RUN=<run>  # keeps the JSON, the CR and the history entry
+make runlog                                     # one row per archived run, with validity flags
+```
+
+- **Warm-up:** on a fresh cluster, run the first experiment of a series once as a warm-up, archive it with a `-warmup`
+  suffix, and delete its history entry. Analysis skips these runs.
+- **Algorithm check:** multi-node CRs log NCCL's choice through the `TUNING` subsystem. The master log line
+  `33554432 Bytes -> Algo <n> proto <m>` gives the choice for the 32 MiB bucket. Algo 1 is Ring and proto 2 is Simple.
+- **Objective runs:** set `targetTime` with `script/solver_whatif.py` before applying the CR.
+
+**4. Analyse and rebuild**
+
+```sh
+make analyze                                    # tables in analysis_out/tables.md, figures in analysis_out/figures/
+make restore-history DRY=1                      # after a cluster rebuild: preview the history entries to recreate
+make restore-history                            # create them from results/*/history.yaml
+```
+
+**5. Tear down** (archive everything first)
+
+```sh
+make monitoring-uninstall
+cd ../example/infra/hyperstack && terraform destroy
+```
+
 ### Prerequisites
 
 - **Tooling:** `go` v1.25.3+, `docker` 17.03+, `kubectl` v1.11.3+, `helm` 3+,
@@ -851,7 +912,7 @@ config/samples/` never starts a GPU job by accident.
    Kubeflow training operator.
 2. The flavor's hourly price in the machine-costs ConfigMap — needed only for
    objective mode. `config/samples/machine-costs-configmap.yaml` lists
-   `n3-L40x1: "1.00"` and `n3-A100x1: "1.35"` (console on-demand prices);
+   `n3-A100x1-spot: "1.08"`, `n3-A100x1: "1.35"` and `n3-L40x1: "1.00"` (console prices; the thesis runs use the spot flavor);
    `hs-build-deploy` applies the ConfigMap. Without a price for the flavor in use,
    objective-mode CRs fall back to a calibration run.
 3. The node-group label (`hyperstack.cloud/node-group-name`, the built-in default; see

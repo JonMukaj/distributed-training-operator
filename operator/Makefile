@@ -392,13 +392,15 @@ monitoring-uninstall: ## Remove the monitoring stack AND the Prometheus PVC (det
 NODE_GROUP ?= default
 
 .PHONY: netprobe
+NETPROBE_STREAMS ?= 4
 netprobe: ## Measure pod-to-pod bandwidth between two nodes with iperf3 (NODE_GROUP=<hyperstack node-group name>, default: the base workers). Applies two pods + a Service, prints Gbit/s, deletes them.
-	@sed 's/hyperstack.cloud\/node-group-name: default/hyperstack.cloud\/node-group-name: $(NODE_GROUP)/' ../example/netprobe/iperf3.yaml > /tmp/netprobe.yaml
+	@sed 's/hyperstack.cloud\/node-group-name: default/hyperstack.cloud\/node-group-name: $(NODE_GROUP)/' ../example/netprobe/iperf3.yaml | sed 's/-P 4/-P $(NETPROBE_STREAMS)/g' > /tmp/netprobe.yaml
 	kubectl apply -f /tmp/netprobe.yaml
 	@echo "waiting for the client to finish (~50 s)..."
 	@kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/iperf3-client --timeout=300s >/dev/null || { kubectl describe pod iperf3-client | tail -15; kubectl delete -f /tmp/netprobe.yaml --ignore-not-found; exit 1; }
-	@kubectl logs iperf3-client | python3 -c "import json,sys; raw=sys.stdin.read(); i=raw.find('}\n{'); docs=[json.loads(raw[:i+1]), json.loads(raw[i+2:])] if i>0 else [json.loads(raw)]; names=['pod -> server (upload)','server -> pod (download)']; [print(f\"  {names[k]:26} {d['end']['sum_received']['bits_per_second']/1e9:6.2f} Gbit/s  ({d['start']['connected'][0]['local_host']} -> {d['start']['connected'][0]['remote_host']}, {d['start']['test_start']['num_streams']} streams)\") for k,d in enumerate(docs)]"
-	@echo "nodes: $$(kubectl get pod iperf3-server iperf3-client -o jsonpath='{range .items[*]}{.spec.nodeName}{\" \"}{end}')"
+	@kubectl logs iperf3-client > netprobe-$(or $(NODE_GROUP),default)-p$(NETPROBE_STREAMS).json
+	@cat netprobe-$(or $(NODE_GROUP),default)-p$(NETPROBE_STREAMS).json | python3 -c "import json,sys; raw=sys.stdin.read(); i=raw.find('}\n{'); docs=[json.loads(raw[:i+1]), json.loads(raw[i+2:])] if i>0 else [json.loads(raw)]; names=['pod -> server (upload)','server -> pod (download)']; [print(f\"  {names[k]:26} {d['end']['sum_received']['bits_per_second']/1e9:6.2f} Gbit/s  ({d['start']['connected'][0]['local_host']} -> {d['start']['connected'][0]['remote_host']}, {d['start']['test_start']['num_streams']} streams)\") for k,d in enumerate(docs)]"
+	@echo "nodes: $$(kubectl get pod iperf3-server iperf3-client -o jsonpath='{range .items[*]}{.spec.nodeName}{" "}{end}')"
 	kubectl delete -f /tmp/netprobe.yaml --ignore-not-found >/dev/null
 
 ##@ Offline results (local Grafana, no cluster needed)
