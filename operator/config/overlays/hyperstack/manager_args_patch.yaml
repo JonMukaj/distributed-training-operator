@@ -23,13 +23,11 @@ spec:
           - --metrics-bind-address=:8080
           - --metrics-secure=false
           - --cloud-provider=hyperstack
-          - --hyperstack-cluster-id=2055
+          - --hyperstack-cluster-id=2091
           - --hyperstack-api-url=https://infrahub-api.nexgencloud.com/v1
-          # The node label that carries the node-group name (verified on a live
-          # cluster: workers carry hyperstack.cloud/node-group-name=<group>).
-          # Re-check with `kubectl get nodes --show-labels` after platform upgrades.
+          # The node label that carries the node-group name ( workers carry hyperstack.cloud/node-group-name=<group>).
           - --hyperstack-nodepool-label=hyperstack.cloud/node-group-name
-          # Hyperstack flavor names (see `List flavors` API) used when the CR does
+          # Hyperstack flavor names used when the CR does
           # not pin spec.hardware.machineType.
           - --default-cpu-machine-type=n1-cpu-small
           - --default-gpu-machine-type=n3-L40x1

@@ -18,7 +18,8 @@ data:
   c4-highcpu-8: "0.35"
 
   # Hyperstack flavors (console on-demand price, CANADA-1)
-  n3-A100x1: "1.35"   # 1x A100-80G-PCIe, 28 vCPU, 120 GB RAM
+  n3-A100x1: "1.35"   # 1x A100-80G-PCIe, 28 vCPU, 120 GB RAM (on-demand)
+  n3-A100x1-spot: "1.08"   # same flavor, spot pricing (used by the thesis runs)
   n3-L40x1: "1.00"    # 1x L40 48 GB, 28 vCPU, 58 GB RAM
   # Add CPU flavors (e.g. n1-cpu-small) only with their real price: a missing key
   # makes the solver fall back to a calibration run, a wrong price corrupts cost

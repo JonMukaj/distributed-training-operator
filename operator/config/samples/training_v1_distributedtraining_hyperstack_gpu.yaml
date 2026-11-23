@@ -214,7 +214,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e1-n1
   topology:
     nodes: 1
@@ -306,7 +306,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e1-n2
   topology:
     nodes: 2
@@ -382,6 +382,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e1-n5: Pythia-410M FULL fine-tuning, 5 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
@@ -473,6 +475,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e1-n7: Pythia-410M FULL fine-tuning, 7 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
@@ -564,6 +568,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e1-n10: Pythia-410M FULL fine-tuning, 10 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
@@ -656,6 +662,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e2-n1: Pythia-410M FULL fine-tuning, 1 node — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
@@ -690,7 +698,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e2-n1             # ≤ 20 chars, unique per CR
   topology:
     nodes: 1
@@ -783,7 +791,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e2-n2
   topology:
     nodes: 2
@@ -861,6 +869,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e2-n5: Pythia-410M FULL fine-tuning, 5 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
@@ -954,6 +964,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e2-n7: Pythia-410M FULL fine-tuning, 7 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
@@ -1047,6 +1059,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e2-n10: Pythia-410M FULL fine-tuning, 10 nodes — AllReduce + NFS data loading (text mode: WikiText-103 `text` column).
@@ -1140,6 +1154,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run A: two-point fit, held-out node count
@@ -1245,6 +1261,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run B: three-point fit, tight target
@@ -1348,6 +1366,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - solver run C: three-point fit, intermediate target
@@ -1449,6 +1469,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # Chapter 5 - repeat of e2-n2 (run-to-run variance)
@@ -1546,3 +1568,199 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
+      - name: NCCL_DEBUG_SUBSYS
+        value: TUNING
+---
+# ---------------------------------------------------------------------------
+# E3 : bf16 gradient exchange, counterpart of E1, 2 nodes
+# Needs image v2.7.0 with --grad_comm_dtype (not built yet). Same work, accumulation and
+# dataset as e1-n2; only the gradient dtype on the wire changes. 1-node baselines are the E1/E2 runs.
+# ---------------------------------------------------------------------------
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  name: e3-n2-pythia410m
+  labels:
+    experiment: e3-n2
+    series: e3
+spec:
+  backend: pytorch
+  hardware:
+    type: gpu
+    machineType: n3-A100x1-spot
+    nodePoolName: dj-e3-n2
+  topology:
+    nodes: 2
+    processesPerNode: 1
+  outputPVCName: distributed-training-output-pvc
+  model:
+    name: EleutherAI/pythia-410m
+    trainingScript: /workspace/scripts/finetune.py
+  dataset:
+    name: synthetic
+    split: train
+  training:
+    batchSize: 4
+    learningRate: "2e-5"
+    epochs: 1
+    maxSteps: -1
+    gradAccumulationSteps: 64
+    ddpBackend: nccl
+  optimization:
+    mixedPrecision: bf16
+    lora:
+      enabled: false
+  pytorchSpec:
+    image: jmukaj/gpu-fine-tuner-hf:v2.7.0
+    command:
+    - torchrun
+    - --nproc_per_node=1
+    - --nnodes=$(WORLD_SIZE)
+    - --node_rank=$(RANK)
+    - --master_addr=$(MASTER_ADDR)
+    - --master_port=23456
+    - /workspace/scripts/finetune.py
+    - --model_name_or_path=EleutherAI/pythia-410m
+    - --output_dir=/mnt/output/checkpoints
+    - --dataset_name=synthetic
+    - --synthetic_samples=50000
+    - --synthetic_seq_len=512
+    - --validation_split_percentage=0.2
+    - --max_train_samples=35840
+    - --max_eval_samples=1000
+    - --use_lora=false
+    - --per_device_train_batch_size=4
+    - --per_device_eval_batch_size=8
+    - --learning_rate=2e-5
+    - --num_train_epochs=1
+    - --max_steps=-1
+    - --gradient_accumulation_steps=64
+    - --max_grad_norm=1.0
+    - --warmup_ratio=0.1
+    - --logging_steps=5
+    - --save_strategy=no
+    - --overwrite_output_dir=True
+    - --do_train=True
+    - --do_eval=True
+    - --bf16=True
+    - --ddp_backend=nccl
+    - --ddp_find_unused_parameters=False
+    - --dataloader_num_workers=2
+    - --report_to=none
+    - --profile_warmup_steps=3
+    - --grad_comm_dtype=bf16
+    resources:
+      requests:
+        cpu: "8"
+        memory: 24Gi
+      limits:
+        cpu: "8"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+    env:
+    - name: HF_HOME
+      value: /mnt/output/hf-cache
+    - name: HF_HUB_DISABLE_XET
+      value: "1"
+    - name: NCCL_DEBUG
+      value: INFO
+    - name: NCCL_DEBUG_SUBSYS
+      value: TUNING
+---
+# ---------------------------------------------------------------------------
+# E4 : bf16 gradient exchange, counterpart of E2, 2 nodes
+# Needs image v2.7.0 with --grad_comm_dtype (not built yet). Same work, accumulation and
+# dataset as e2-n2; only the gradient dtype on the wire changes. 1-node baselines are the E1/E2 runs.
+# ---------------------------------------------------------------------------
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTraining
+metadata:
+  name: e4-n2-pythia410m
+  labels:
+    experiment: e4-n2
+    series: e4
+spec:
+  backend: pytorch
+  hardware:
+    type: gpu
+    machineType: n3-A100x1-spot
+    nodePoolName: dj-e4-n2
+  topology:
+    nodes: 2
+    processesPerNode: 1
+  outputPVCName: distributed-training-output-pvc
+  model:
+    name: EleutherAI/pythia-410m
+    trainingScript: /workspace/scripts/finetune.py
+  dataset:
+    name: wikitext/wikitext-103-raw-v1
+    split: train
+  training:
+    batchSize: 4
+    learningRate: "2e-5"
+    epochs: 1
+    maxSteps: -1
+    gradAccumulationSteps: 64
+    ddpBackend: nccl
+  optimization:
+    mixedPrecision: bf16
+    lora:
+      enabled: false
+  pytorchSpec:
+    image: jmukaj/gpu-fine-tuner-hf:v2.7.0
+    command:
+    - torchrun
+    - --nproc_per_node=1
+    - --nnodes=$(WORLD_SIZE)
+    - --node_rank=$(RANK)
+    - --master_addr=$(MASTER_ADDR)
+    - --master_port=23456
+    - /workspace/scripts/finetune.py
+    - --model_name_or_path=EleutherAI/pythia-410m
+    - --output_dir=/mnt/output/checkpoints
+    - --dataset_name=wikitext
+    - --dataset_config_name=wikitext-103-raw-v1
+    - --dataset_cache_directory=/mnt/output/hf-cache/datasets-packed512
+    - --pack_text=true
+    - --max_seq_length=512
+    - --max_train_samples=35840
+    - --max_eval_samples=1000
+    - --validation_split_percentage=0.2
+    - --use_lora=false
+    - --per_device_train_batch_size=4
+    - --per_device_eval_batch_size=8
+    - --learning_rate=2e-5
+    - --num_train_epochs=1
+    - --max_steps=-1
+    - --gradient_accumulation_steps=64
+    - --max_grad_norm=1.0
+    - --warmup_ratio=0.1
+    - --logging_steps=5
+    - --save_strategy=no
+    - --overwrite_output_dir=True
+    - --do_train=True
+    - --do_eval=True
+    - --bf16=True
+    - --ddp_backend=nccl
+    - --ddp_find_unused_parameters=False
+    - --dataloader_num_workers=2
+    - --report_to=none
+    - --profile_warmup_steps=3
+    - --grad_comm_dtype=bf16
+    resources:
+      requests:
+        cpu: "8"
+        memory: 24Gi
+      limits:
+        cpu: "8"
+        memory: 24Gi
+        nvidia.com/gpu: "1"
+    env:
+    - name: HF_HOME
+      value: /mnt/output/hf-cache
+    - name: HF_HUB_DISABLE_XET
+      value: "1"
+    - name: NCCL_DEBUG
+      value: INFO
+    - name: NCCL_DEBUG_SUBSYS
+      value: TUNING

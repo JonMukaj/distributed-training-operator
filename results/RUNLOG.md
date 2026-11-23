@@ -6,4 +6,10 @@ put anomalies in `results/<RUN>/notes.txt` and regenerate.
 | date | run | series | kind | n | provisioning | training | inner loop | samples/s (wall) | alpha (wall) | bottleneck | eval loss | cost $ | anomalies |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-11-21 | e1-n1 | e1 | fixed | 1 | 5m23s | 10m27s | 10m02s | 57.2 | - | compute-bound | 10.815 | 0.28 |  |
-| 2026-11-21 | e1-n2 | e1 | fixed | 2 | 9m45s | 9m29s | 8m12s | 63.0 | 0.815 | communication-bound | 10.825 | 0.69 |  |
+| 2026-11-21 | e1-n2 | e1 | fixed | 2 | 9m45s | 9m29s | 8m12s | 63.0 | 0.809 | communication-bound | 10.825 | 0.69 |  |
+| 2026-11-22 | e1-n1-rep1 | e1 | fixed | 1 | 7m04s | 10m32s | 10m02s | 56.7 | - | compute-bound | 10.816 | 0.32 |  |
+| 2026-11-22 | e1-n1-rep2 | e1 | fixed | 1 | 6m43s | 10m29s | 10m03s | 57.0 | - | compute-bound | 10.816 | 0.31 |  |
+| 2026-11-22 | e1-n2-rep1 | e1 | fixed | 2 | 6m44s | 10m12s | 8m55s | 58.6 | 0.946 | communication-bound | 10.826 | 0.61 |  |
+| 2026-11-22 | e1-n2-rep2 | e1 | fixed | 2 | 7m04s | 10m43s | 9m27s | 55.7 | 1.045 | communication-bound | 10.826 | 0.64 |  |
+| 2026-11-23 | e1-n1-rep3 | e1 | fixed | 1 | 5m23s | 10m28s | 10m02s | 57.1 | - | compute-bound | 10.815 | 0.29 |  |
+| 2026-11-23 | e1-n2-rep3 | e1 | fixed | 2 | 7m04s | 10m00s | 8m45s | 59.7 | 0.908 | communication-bound | 10.825 | 0.61 |  |

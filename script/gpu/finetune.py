@@ -171,6 +171,7 @@ class CommState:
         self.lock = threading.Lock()
         self.timing = "none"     # "cuda_events" or "callback", set by the first hook call
         self.step_ref = None     # CUDA event recorded at step start: common time base for this step's events
+        self.wire_dtype = torch.float32   # dtype the gradients are sent in (bf16 with --grad_comm_dtype bf16)
         self.reset()
 
     def reset(self):
@@ -223,14 +224,21 @@ def allreduce_hook(state, bucket):
     else:
         state.timing = "callback"
         t0 = time.perf_counter()
+    low = state.wire_dtype != buf.dtype
+    wire_nbytes = buf.numel() * torch.empty((), dtype=state.wire_dtype).element_size()
     with state.lock:
         if not use_events and state.inflight == 0:
             state.span_start = t0
         state.inflight += 1
         state.reduced_bytes += nbytes
-        state.wire_bytes += nbytes * state.wire_factor
-    buf.div_(state.world_size)  # average, as DDP's default AllReduce does
-    fut = dist.all_reduce(buf, async_op=True).get_future()
+        state.wire_bytes += wire_nbytes * state.wire_factor
+    if low:
+        # average in fp32, then send in the wire dtype; the result is copied back to fp32 below
+        send = buf.div(state.world_size).to(state.wire_dtype)
+    else:
+        buf.div_(state.world_size)  # average, as DDP's default AllReduce does
+        send = buf
+    fut = dist.all_reduce(send, async_op=True).get_future()
 
     def done(f):
         if use_events:
@@ -246,6 +254,9 @@ def allreduce_hook(state, bucket):
                 state.inflight -= 1
                 if state.inflight == 0:
                     state.total_s += now - state.span_start
+        if low:
+            buf.copy_(send)            # back to fp32 for the optimizer
+            return buf
         return f.value()[0]
 
     return fut.then(done)
@@ -286,10 +297,11 @@ class TransferProfileCallback(TrainerCallback):
     """Collects the transfer profile during trainer.train(); write it with
     finalize() after the final model save so checkpoint bytes are included."""
 
-    def __init__(self, trainer, warmup_steps, probe_mib=256):
+    def __init__(self, trainer, warmup_steps, probe_mib=256, grad_comm_dtype="fp32"):
         self.trainer = trainer
         self.warmup = warmup_steps
         self.probe_mib = probe_mib
+        self.grad_comm_dtype = grad_comm_dtype
         self.probe = None               # (seconds per pass, bytes per pass)
         self.comm = CommState(1)
         self.world_size = 1
@@ -344,6 +356,7 @@ class TransferProfileCallback(TrainerCallback):
         self.grad_size_bytes = sum(p.numel() * p.element_size() for p in params if p.requires_grad)
         self.world_size = dist.get_world_size() if dist.is_available() and dist.is_initialized() else 1
         self.comm = CommState(self.world_size)
+        self.comm.wire_dtype = {"fp32": torch.float32, "bf16": torch.bfloat16}[self.grad_comm_dtype]
         wrapped = self.trainer.model_wrapped  # DDP-wrapped before on_train_begin fires
         if self.world_size > 1 and isinstance(wrapped, DDP):
             wrapped.register_comm_hook(self.comm, allreduce_hook)
@@ -461,6 +474,7 @@ class TransferProfileCallback(TrainerCallback):
             "nfs_write_bytes": nfs_write_b,
             "checkpoint_size_bytes": dir_size_bytes(output_dir),
 
+            "grad_comm_dtype": self.grad_comm_dtype,
             "allreduce_timing": self.comm.timing,
             "allreduce_events_dropped": self.comm.events_dropped,
             "allreduce_probe_s": probe_s,
@@ -490,6 +504,12 @@ class ProfileArguments:
         default=256,
         metadata={"help": "MiB all-reduced (blocking, a few passes) at train start of multi-node runs to cross-check the "
                           "hook's AllReduce timing. Adds about 3 s to the run. 0 disables."},
+    )
+    grad_comm_dtype: str = field(
+        default="fp32",
+        metadata={"help": "Dtype the gradients are sent in for the all-reduce. bf16 halves the bytes on the wire "
+                          "(averaging stays in fp32, the result is copied back). Needs the transfer-profile hook.",
+                  "choices": ["fp32", "bf16"]},
     )
     disable_transfer_profile: bool = field(
         default=False,
@@ -1155,8 +1175,11 @@ def main():
         trainer.add_callback(CustomPrinterCallback)
 
         profiler = None
+        if profile_args.grad_comm_dtype != "fp32" and profile_args.disable_transfer_profile:
+            raise ValueError("--grad_comm_dtype bf16 needs the transfer-profile hook: drop --disable_transfer_profile")
         if not profile_args.disable_transfer_profile:
-            profiler = TransferProfileCallback(trainer, profile_args.profile_warmup_steps, profile_args.profile_probe_mib)
+            profiler = TransferProfileCallback(trainer, profile_args.profile_warmup_steps, profile_args.profile_probe_mib,
+                                               profile_args.grad_comm_dtype)
             trainer.add_callback(profiler)
 
         training_start = datetime.now()

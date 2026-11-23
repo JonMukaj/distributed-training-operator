@@ -1,0 +1,27 @@
+apiVersion: training.distributedtraining.io/v1
+kind: DistributedTrainingHistory
+metadata:
+  creationTimestamp: "2026-11-22T22:48:10Z"
+  generateName: djh-e1-n1-pythia410m-rep1-
+  generation: 1
+  labels:
+    config-hash: 0ca6df17792546330b354423c53cd5c1b5a34c834197554cec8b8075e99bd53
+  name: djh-e1-n1-pythia410m-rep1-bw4sp
+  namespace: default
+  resourceVersion: "11471"
+  uid: 99970f64-4844-4f9e-8707-8355b57b02b9
+spec:
+  allReduceBandwidthMBs: "0.0000"
+  allReduceFraction: "0.000000"
+  backend: pytorch
+  computeFraction: "0.975452"
+  configHash: 0ca6df17792546330b354423c53cd5c1b5a34c834197554cec8b8075e99bd53
+  dataloadFraction: "0.024268"
+  gradSizeBytes: 1621336064
+  machineType: n3-A100x1-spot
+  nfsReadBandwidthMBs: "0.0559"
+  nodes: 1
+  provisioningSeconds: "424"
+  throughput: 56708860760n
+  totalWork: "35840"
+  trainingSeconds: "632"
