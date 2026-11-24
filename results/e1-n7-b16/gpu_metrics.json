@@ -1,0 +1,5054 @@
+{
+ "run": "e1-n7-b16",
+ "cr": "e1-n7-pythia410m",
+ "window": {
+  "start": "2026-11-24T23:05:27Z",
+  "end": "2026-11-24T23:11:06Z"
+ },
+ "pod_regex": "pj-e1-n7-pythia410m-(master|worker)-.*",
+ "step_seconds": 15,
+ "series": [
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "100"
+    ],
+    [
+     1795561662.0,
+     "100"
+    ],
+    [
+     1795561677.0,
+     "100"
+    ],
+    [
+     1795561692.0,
+     "100"
+    ],
+    [
+     1795561707.0,
+     "100"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "100"
+    ],
+    [
+     1795561752.0,
+     "100"
+    ],
+    [
+     1795561767.0,
+     "100"
+    ],
+    [
+     1795561782.0,
+     "100"
+    ],
+    [
+     1795561797.0,
+     "98"
+    ],
+    [
+     1795561812.0,
+     "98"
+    ],
+    [
+     1795561827.0,
+     "100"
+    ],
+    [
+     1795561842.0,
+     "100"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "100"
+    ],
+    [
+     1795561662.0,
+     "100"
+    ],
+    [
+     1795561677.0,
+     "100"
+    ],
+    [
+     1795561692.0,
+     "100"
+    ],
+    [
+     1795561707.0,
+     "100"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "98"
+    ],
+    [
+     1795561752.0,
+     "98"
+    ],
+    [
+     1795561767.0,
+     "99"
+    ],
+    [
+     1795561782.0,
+     "99"
+    ],
+    [
+     1795561797.0,
+     "100"
+    ],
+    [
+     1795561812.0,
+     "100"
+    ],
+    [
+     1795561827.0,
+     "100"
+    ],
+    [
+     1795561842.0,
+     "100"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "100"
+    ],
+    [
+     1795561647.0,
+     "100"
+    ],
+    [
+     1795561662.0,
+     "100"
+    ],
+    [
+     1795561677.0,
+     "100"
+    ],
+    [
+     1795561692.0,
+     "100"
+    ],
+    [
+     1795561707.0,
+     "100"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "100"
+    ],
+    [
+     1795561752.0,
+     "100"
+    ],
+    [
+     1795561767.0,
+     "100"
+    ],
+    [
+     1795561782.0,
+     "99"
+    ],
+    [
+     1795561797.0,
+     "99"
+    ],
+    [
+     1795561812.0,
+     "98"
+    ],
+    [
+     1795561827.0,
+     "98"
+    ],
+    [
+     1795561842.0,
+     "0"
+    ],
+    [
+     1795561857.0,
+     "0"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "98"
+    ],
+    [
+     1795561677.0,
+     "98"
+    ],
+    [
+     1795561692.0,
+     "99"
+    ],
+    [
+     1795561707.0,
+     "99"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "100"
+    ],
+    [
+     1795561752.0,
+     "100"
+    ],
+    [
+     1795561767.0,
+     "100"
+    ],
+    [
+     1795561782.0,
+     "100"
+    ],
+    [
+     1795561797.0,
+     "100"
+    ],
+    [
+     1795561812.0,
+     "99"
+    ],
+    [
+     1795561827.0,
+     "99"
+    ],
+    [
+     1795561842.0,
+     "0"
+    ],
+    [
+     1795561857.0,
+     "0"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "1"
+    ],
+    [
+     1795561647.0,
+     "1"
+    ],
+    [
+     1795561662.0,
+     "98"
+    ],
+    [
+     1795561677.0,
+     "98"
+    ],
+    [
+     1795561692.0,
+     "99"
+    ],
+    [
+     1795561707.0,
+     "99"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "100"
+    ],
+    [
+     1795561752.0,
+     "100"
+    ],
+    [
+     1795561767.0,
+     "100"
+    ],
+    [
+     1795561782.0,
+     "100"
+    ],
+    [
+     1795561797.0,
+     "100"
+    ],
+    [
+     1795561812.0,
+     "99"
+    ],
+    [
+     1795561827.0,
+     "99"
+    ],
+    [
+     1795561842.0,
+     "100"
+    ],
+    [
+     1795561857.0,
+     "100"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "100"
+    ],
+    [
+     1795561662.0,
+     "100"
+    ],
+    [
+     1795561677.0,
+     "100"
+    ],
+    [
+     1795561692.0,
+     "100"
+    ],
+    [
+     1795561707.0,
+     "100"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "98"
+    ],
+    [
+     1795561752.0,
+     "98"
+    ],
+    [
+     1795561767.0,
+     "98"
+    ],
+    [
+     1795561782.0,
+     "98"
+    ],
+    [
+     1795561797.0,
+     "100"
+    ],
+    [
+     1795561812.0,
+     "100"
+    ],
+    [
+     1795561827.0,
+     "0"
+    ],
+    [
+     1795561842.0,
+     "0"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_UTIL",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_DEV_GPU_UTIL",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "100"
+    ],
+    [
+     1795561662.0,
+     "100"
+    ],
+    [
+     1795561677.0,
+     "100"
+    ],
+    [
+     1795561692.0,
+     "100"
+    ],
+    [
+     1795561707.0,
+     "100"
+    ],
+    [
+     1795561722.0,
+     "100"
+    ],
+    [
+     1795561737.0,
+     "98"
+    ],
+    [
+     1795561752.0,
+     "98"
+    ],
+    [
+     1795561767.0,
+     "100"
+    ],
+    [
+     1795561782.0,
+     "100"
+    ],
+    [
+     1795561797.0,
+     "100"
+    ],
+    [
+     1795561812.0,
+     "100"
+    ],
+    [
+     1795561827.0,
+     "100"
+    ],
+    [
+     1795561842.0,
+     "100"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0"
+    ],
+    [
+     1795561677.0,
+     "0.049731"
+    ],
+    [
+     1795561692.0,
+     "0.049731"
+    ],
+    [
+     1795561707.0,
+     "0.096882"
+    ],
+    [
+     1795561722.0,
+     "0.096882"
+    ],
+    [
+     1795561737.0,
+     "0.096962"
+    ],
+    [
+     1795561752.0,
+     "0.096962"
+    ],
+    [
+     1795561767.0,
+     "0.096975"
+    ],
+    [
+     1795561782.0,
+     "0.096975"
+    ],
+    [
+     1795561797.0,
+     "0.097004"
+    ],
+    [
+     1795561812.0,
+     "0.097004"
+    ],
+    [
+     1795561827.0,
+     "0.127307"
+    ],
+    [
+     1795561842.0,
+     "0.127307"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0"
+    ],
+    [
+     1795561677.0,
+     "0.043981"
+    ],
+    [
+     1795561692.0,
+     "0.043981"
+    ],
+    [
+     1795561707.0,
+     "0.09725"
+    ],
+    [
+     1795561722.0,
+     "0.09725"
+    ],
+    [
+     1795561737.0,
+     "0.097336"
+    ],
+    [
+     1795561752.0,
+     "0.097336"
+    ],
+    [
+     1795561767.0,
+     "0.109095"
+    ],
+    [
+     1795561782.0,
+     "0.109095"
+    ],
+    [
+     1795561797.0,
+     "0.114066"
+    ],
+    [
+     1795561812.0,
+     "0.114066"
+    ],
+    [
+     1795561827.0,
+     "0.102325"
+    ],
+    [
+     1795561842.0,
+     "0.102325"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0.000001"
+    ],
+    [
+     1795561677.0,
+     "0.000001"
+    ],
+    [
+     1795561692.0,
+     "0.097836"
+    ],
+    [
+     1795561707.0,
+     "0.097836"
+    ],
+    [
+     1795561722.0,
+     "0.098245"
+    ],
+    [
+     1795561737.0,
+     "0.098245"
+    ],
+    [
+     1795561752.0,
+     "0.098508"
+    ],
+    [
+     1795561767.0,
+     "0.098508"
+    ],
+    [
+     1795561782.0,
+     "0.098708"
+    ],
+    [
+     1795561797.0,
+     "0.098708"
+    ],
+    [
+     1795561812.0,
+     "0.108994"
+    ],
+    [
+     1795561827.0,
+     "0.108994"
+    ],
+    [
+     1795561842.0,
+     "0.123364"
+    ],
+    [
+     1795561857.0,
+     "0.123364"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0.000001"
+    ],
+    [
+     1795561677.0,
+     "0.000001"
+    ],
+    [
+     1795561692.0,
+     "0.093324"
+    ],
+    [
+     1795561707.0,
+     "0.093324"
+    ],
+    [
+     1795561722.0,
+     "0.09299"
+    ],
+    [
+     1795561737.0,
+     "0.09299"
+    ],
+    [
+     1795561752.0,
+     "0.106386"
+    ],
+    [
+     1795561767.0,
+     "0.106386"
+    ],
+    [
+     1795561782.0,
+     "0.09768"
+    ],
+    [
+     1795561797.0,
+     "0.09768"
+    ],
+    [
+     1795561812.0,
+     "0.097752"
+    ],
+    [
+     1795561827.0,
+     "0.097752"
+    ],
+    [
+     1795561842.0,
+     "0.120561"
+    ],
+    [
+     1795561857.0,
+     "0.120561"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0.09117"
+    ],
+    [
+     1795561677.0,
+     "0.09117"
+    ],
+    [
+     1795561692.0,
+     "0.09117"
+    ],
+    [
+     1795561707.0,
+     "0.09117"
+    ],
+    [
+     1795561722.0,
+     "0.093636"
+    ],
+    [
+     1795561737.0,
+     "0.093636"
+    ],
+    [
+     1795561752.0,
+     "0.109922"
+    ],
+    [
+     1795561767.0,
+     "0.109922"
+    ],
+    [
+     1795561782.0,
+     "0.09837"
+    ],
+    [
+     1795561797.0,
+     "0.09837"
+    ],
+    [
+     1795561812.0,
+     "0.098349"
+    ],
+    [
+     1795561827.0,
+     "0.098349"
+    ],
+    [
+     1795561842.0,
+     "0.118797"
+    ],
+    [
+     1795561857.0,
+     "0.118797"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0"
+    ],
+    [
+     1795561677.0,
+     "0.067026"
+    ],
+    [
+     1795561692.0,
+     "0.067026"
+    ],
+    [
+     1795561707.0,
+     "0.097284"
+    ],
+    [
+     1795561722.0,
+     "0.097284"
+    ],
+    [
+     1795561737.0,
+     "0.097373"
+    ],
+    [
+     1795561752.0,
+     "0.097373"
+    ],
+    [
+     1795561767.0,
+     "0.105338"
+    ],
+    [
+     1795561782.0,
+     "0.105338"
+    ],
+    [
+     1795561797.0,
+     "0.123105"
+    ],
+    [
+     1795561812.0,
+     "0.123105"
+    ],
+    [
+     1795561827.0,
+     "0.097466"
+    ],
+    [
+     1795561842.0,
+     "0.097466"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "0"
+    ],
+    [
+     1795561662.0,
+     "0"
+    ],
+    [
+     1795561677.0,
+     "0.049693"
+    ],
+    [
+     1795561692.0,
+     "0.049693"
+    ],
+    [
+     1795561707.0,
+     "0.097644"
+    ],
+    [
+     1795561722.0,
+     "0.097644"
+    ],
+    [
+     1795561737.0,
+     "0.097703"
+    ],
+    [
+     1795561752.0,
+     "0.097703"
+    ],
+    [
+     1795561767.0,
+     "0.119751"
+    ],
+    [
+     1795561782.0,
+     "0.119751"
+    ],
+    [
+     1795561797.0,
+     "0.109313"
+    ],
+    [
+     1795561812.0,
+     "0.109313"
+    ],
+    [
+     1795561827.0,
+     "0.097815"
+    ],
+    [
+     1795561842.0,
+     "0.097815"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "44.67"
+    ],
+    [
+     1795561542.0,
+     "44.67"
+    ],
+    [
+     1795561557.0,
+     "44.77"
+    ],
+    [
+     1795561572.0,
+     "44.77"
+    ],
+    [
+     1795561587.0,
+     "44.77"
+    ],
+    [
+     1795561602.0,
+     "44.77"
+    ],
+    [
+     1795561617.0,
+     "44.876"
+    ],
+    [
+     1795561632.0,
+     "44.876"
+    ],
+    [
+     1795561647.0,
+     "93"
+    ],
+    [
+     1795561662.0,
+     "93"
+    ],
+    [
+     1795561677.0,
+     "95.118"
+    ],
+    [
+     1795561692.0,
+     "95.118"
+    ],
+    [
+     1795561707.0,
+     "95.989"
+    ],
+    [
+     1795561722.0,
+     "95.989"
+    ],
+    [
+     1795561737.0,
+     "96.654"
+    ],
+    [
+     1795561752.0,
+     "96.654"
+    ],
+    [
+     1795561767.0,
+     "96.553"
+    ],
+    [
+     1795561782.0,
+     "96.553"
+    ],
+    [
+     1795561797.0,
+     "312.949"
+    ],
+    [
+     1795561812.0,
+     "312.949"
+    ],
+    [
+     1795561827.0,
+     "98.984"
+    ],
+    [
+     1795561842.0,
+     "98.984"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "68.915"
+    ],
+    [
+     1795561542.0,
+     "68.915"
+    ],
+    [
+     1795561557.0,
+     "68.902"
+    ],
+    [
+     1795561572.0,
+     "68.902"
+    ],
+    [
+     1795561587.0,
+     "68.792"
+    ],
+    [
+     1795561602.0,
+     "68.792"
+    ],
+    [
+     1795561617.0,
+     "68.86"
+    ],
+    [
+     1795561632.0,
+     "68.86"
+    ],
+    [
+     1795561647.0,
+     "115.385"
+    ],
+    [
+     1795561662.0,
+     "115.385"
+    ],
+    [
+     1795561677.0,
+     "119.017"
+    ],
+    [
+     1795561692.0,
+     "119.017"
+    ],
+    [
+     1795561707.0,
+     "119.927"
+    ],
+    [
+     1795561722.0,
+     "119.927"
+    ],
+    [
+     1795561737.0,
+     "296.616"
+    ],
+    [
+     1795561752.0,
+     "296.616"
+    ],
+    [
+     1795561767.0,
+     "311.182"
+    ],
+    [
+     1795561782.0,
+     "311.182"
+    ],
+    [
+     1795561797.0,
+     "121.336"
+    ],
+    [
+     1795561812.0,
+     "121.336"
+    ],
+    [
+     1795561827.0,
+     "120.851"
+    ],
+    [
+     1795561842.0,
+     "120.851"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "50.608"
+    ],
+    [
+     1795561542.0,
+     "50.478"
+    ],
+    [
+     1795561557.0,
+     "50.478"
+    ],
+    [
+     1795561572.0,
+     "50.577"
+    ],
+    [
+     1795561587.0,
+     "50.577"
+    ],
+    [
+     1795561602.0,
+     "50.466"
+    ],
+    [
+     1795561617.0,
+     "50.466"
+    ],
+    [
+     1795561632.0,
+     "98.979"
+    ],
+    [
+     1795561647.0,
+     "98.979"
+    ],
+    [
+     1795561662.0,
+     "124.55"
+    ],
+    [
+     1795561677.0,
+     "124.55"
+    ],
+    [
+     1795561692.0,
+     "132.446"
+    ],
+    [
+     1795561707.0,
+     "132.446"
+    ],
+    [
+     1795561722.0,
+     "135.795"
+    ],
+    [
+     1795561737.0,
+     "135.795"
+    ],
+    [
+     1795561752.0,
+     "134.39"
+    ],
+    [
+     1795561767.0,
+     "134.39"
+    ],
+    [
+     1795561782.0,
+     "308.309"
+    ],
+    [
+     1795561797.0,
+     "308.309"
+    ],
+    [
+     1795561812.0,
+     "313.486"
+    ],
+    [
+     1795561827.0,
+     "313.486"
+    ],
+    [
+     1795561842.0,
+     "126.043"
+    ],
+    [
+     1795561857.0,
+     "126.043"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "48.904"
+    ],
+    [
+     1795561542.0,
+     "48.873"
+    ],
+    [
+     1795561557.0,
+     "48.873"
+    ],
+    [
+     1795561572.0,
+     "48.848"
+    ],
+    [
+     1795561587.0,
+     "48.848"
+    ],
+    [
+     1795561602.0,
+     "48.957"
+    ],
+    [
+     1795561617.0,
+     "48.957"
+    ],
+    [
+     1795561632.0,
+     "99.902"
+    ],
+    [
+     1795561647.0,
+     "99.902"
+    ],
+    [
+     1795561662.0,
+     "290.347"
+    ],
+    [
+     1795561677.0,
+     "290.347"
+    ],
+    [
+     1795561692.0,
+     "304.869"
+    ],
+    [
+     1795561707.0,
+     "304.869"
+    ],
+    [
+     1795561722.0,
+     "107.718"
+    ],
+    [
+     1795561737.0,
+     "107.718"
+    ],
+    [
+     1795561752.0,
+     "108.481"
+    ],
+    [
+     1795561767.0,
+     "108.481"
+    ],
+    [
+     1795561782.0,
+     "108.579"
+    ],
+    [
+     1795561797.0,
+     "108.579"
+    ],
+    [
+     1795561812.0,
+     "295.723"
+    ],
+    [
+     1795561827.0,
+     "295.723"
+    ],
+    [
+     1795561842.0,
+     "106.292"
+    ],
+    [
+     1795561857.0,
+     "106.292"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "49.997"
+    ],
+    [
+     1795561542.0,
+     "50.222"
+    ],
+    [
+     1795561557.0,
+     "50.222"
+    ],
+    [
+     1795561572.0,
+     "50.024"
+    ],
+    [
+     1795561587.0,
+     "50.024"
+    ],
+    [
+     1795561602.0,
+     "50.006"
+    ],
+    [
+     1795561617.0,
+     "50.006"
+    ],
+    [
+     1795561632.0,
+     "101.844"
+    ],
+    [
+     1795561647.0,
+     "101.844"
+    ],
+    [
+     1795561662.0,
+     "294.518"
+    ],
+    [
+     1795561677.0,
+     "294.518"
+    ],
+    [
+     1795561692.0,
+     "299.137"
+    ],
+    [
+     1795561707.0,
+     "299.137"
+    ],
+    [
+     1795561722.0,
+     "111.895"
+    ],
+    [
+     1795561737.0,
+     "111.895"
+    ],
+    [
+     1795561752.0,
+     "112.365"
+    ],
+    [
+     1795561767.0,
+     "112.365"
+    ],
+    [
+     1795561782.0,
+     "112.058"
+    ],
+    [
+     1795561797.0,
+     "112.058"
+    ],
+    [
+     1795561812.0,
+     "309.139"
+    ],
+    [
+     1795561827.0,
+     "309.139"
+    ],
+    [
+     1795561842.0,
+     "110.848"
+    ],
+    [
+     1795561857.0,
+     "110.848"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "48.298"
+    ],
+    [
+     1795561542.0,
+     "48.298"
+    ],
+    [
+     1795561557.0,
+     "48.613"
+    ],
+    [
+     1795561572.0,
+     "48.613"
+    ],
+    [
+     1795561587.0,
+     "48.653"
+    ],
+    [
+     1795561602.0,
+     "48.653"
+    ],
+    [
+     1795561617.0,
+     "48.398"
+    ],
+    [
+     1795561632.0,
+     "48.398"
+    ],
+    [
+     1795561647.0,
+     "100.635"
+    ],
+    [
+     1795561662.0,
+     "100.635"
+    ],
+    [
+     1795561677.0,
+     "103.995"
+    ],
+    [
+     1795561692.0,
+     "103.995"
+    ],
+    [
+     1795561707.0,
+     "105.102"
+    ],
+    [
+     1795561722.0,
+     "105.102"
+    ],
+    [
+     1795561737.0,
+     "298.304"
+    ],
+    [
+     1795561752.0,
+     "298.304"
+    ],
+    [
+     1795561767.0,
+     "286.896"
+    ],
+    [
+     1795561782.0,
+     "286.896"
+    ],
+    [
+     1795561797.0,
+     "107.65"
+    ],
+    [
+     1795561812.0,
+     "107.65"
+    ],
+    [
+     1795561827.0,
+     "105.632"
+    ],
+    [
+     1795561842.0,
+     "105.632"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_POWER_USAGE",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_DEV_POWER_USAGE",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "48.613"
+    ],
+    [
+     1795561542.0,
+     "48.613"
+    ],
+    [
+     1795561557.0,
+     "48.625"
+    ],
+    [
+     1795561572.0,
+     "48.625"
+    ],
+    [
+     1795561587.0,
+     "48.598"
+    ],
+    [
+     1795561602.0,
+     "48.598"
+    ],
+    [
+     1795561617.0,
+     "48.636"
+    ],
+    [
+     1795561632.0,
+     "48.636"
+    ],
+    [
+     1795561647.0,
+     "100.507"
+    ],
+    [
+     1795561662.0,
+     "100.507"
+    ],
+    [
+     1795561677.0,
+     "104.142"
+    ],
+    [
+     1795561692.0,
+     "104.142"
+    ],
+    [
+     1795561707.0,
+     "105.795"
+    ],
+    [
+     1795561722.0,
+     "105.795"
+    ],
+    [
+     1795561737.0,
+     "278.759"
+    ],
+    [
+     1795561752.0,
+     "278.759"
+    ],
+    [
+     1795561767.0,
+     "110.377"
+    ],
+    [
+     1795561782.0,
+     "110.377"
+    ],
+    [
+     1795561797.0,
+     "108.101"
+    ],
+    [
+     1795561812.0,
+     "108.101"
+    ],
+    [
+     1795561827.0,
+     "109.357"
+    ],
+    [
+     1795561842.0,
+     "109.357"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "19852"
+    ],
+    [
+     1795561662.0,
+     "19852"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "19852"
+    ],
+    [
+     1795561662.0,
+     "19852"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "5224"
+    ],
+    [
+     1795561647.0,
+     "5224"
+    ],
+    [
+     1795561662.0,
+     "23000"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ],
+    [
+     1795561857.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "5224"
+    ],
+    [
+     1795561647.0,
+     "5224"
+    ],
+    [
+     1795561662.0,
+     "23000"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ],
+    [
+     1795561857.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "5224"
+    ],
+    [
+     1795561647.0,
+     "5224"
+    ],
+    [
+     1795561662.0,
+     "23000"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ],
+    [
+     1795561857.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "3"
+    ],
+    [
+     1795561632.0,
+     "3"
+    ],
+    [
+     1795561647.0,
+     "23000"
+    ],
+    [
+     1795561662.0,
+     "23000"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_FB_USED",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_DEV_FB_USED",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "0"
+    ],
+    [
+     1795561542.0,
+     "0"
+    ],
+    [
+     1795561557.0,
+     "0"
+    ],
+    [
+     1795561572.0,
+     "0"
+    ],
+    [
+     1795561587.0,
+     "0"
+    ],
+    [
+     1795561602.0,
+     "0"
+    ],
+    [
+     1795561617.0,
+     "0"
+    ],
+    [
+     1795561632.0,
+     "0"
+    ],
+    [
+     1795561647.0,
+     "19852"
+    ],
+    [
+     1795561662.0,
+     "19852"
+    ],
+    [
+     1795561677.0,
+     "23000"
+    ],
+    [
+     1795561692.0,
+     "23000"
+    ],
+    [
+     1795561707.0,
+     "23000"
+    ],
+    [
+     1795561722.0,
+     "23000"
+    ],
+    [
+     1795561737.0,
+     "23000"
+    ],
+    [
+     1795561752.0,
+     "23000"
+    ],
+    [
+     1795561767.0,
+     "23000"
+    ],
+    [
+     1795561782.0,
+     "23000"
+    ],
+    [
+     1795561797.0,
+     "23000"
+    ],
+    [
+     1795561812.0,
+     "23000"
+    ],
+    [
+     1795561827.0,
+     "23000"
+    ],
+    [
+     1795561842.0,
+     "23000"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "210"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1410"
+    ],
+    [
+     1795561677.0,
+     "1410"
+    ],
+    [
+     1795561692.0,
+     "1410"
+    ],
+    [
+     1795561707.0,
+     "1410"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1410"
+    ],
+    [
+     1795561752.0,
+     "1410"
+    ],
+    [
+     1795561767.0,
+     "1410"
+    ],
+    [
+     1795561782.0,
+     "1410"
+    ],
+    [
+     1795561797.0,
+     "1305"
+    ],
+    [
+     1795561812.0,
+     "1305"
+    ],
+    [
+     1795561827.0,
+     "1410"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "210"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1410"
+    ],
+    [
+     1795561677.0,
+     "1410"
+    ],
+    [
+     1795561692.0,
+     "1410"
+    ],
+    [
+     1795561707.0,
+     "1410"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1260"
+    ],
+    [
+     1795561752.0,
+     "1260"
+    ],
+    [
+     1795561767.0,
+     "1290"
+    ],
+    [
+     1795561782.0,
+     "1290"
+    ],
+    [
+     1795561797.0,
+     "1410"
+    ],
+    [
+     1795561812.0,
+     "1410"
+    ],
+    [
+     1795561827.0,
+     "1410"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "1410"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1410"
+    ],
+    [
+     1795561677.0,
+     "1410"
+    ],
+    [
+     1795561692.0,
+     "1410"
+    ],
+    [
+     1795561707.0,
+     "1410"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1410"
+    ],
+    [
+     1795561752.0,
+     "1410"
+    ],
+    [
+     1795561767.0,
+     "1410"
+    ],
+    [
+     1795561782.0,
+     "1260"
+    ],
+    [
+     1795561797.0,
+     "1260"
+    ],
+    [
+     1795561812.0,
+     "1320"
+    ],
+    [
+     1795561827.0,
+     "1320"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ],
+    [
+     1795561857.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "1410"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1290"
+    ],
+    [
+     1795561677.0,
+     "1290"
+    ],
+    [
+     1795561692.0,
+     "1275"
+    ],
+    [
+     1795561707.0,
+     "1275"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1410"
+    ],
+    [
+     1795561752.0,
+     "1410"
+    ],
+    [
+     1795561767.0,
+     "1410"
+    ],
+    [
+     1795561782.0,
+     "1410"
+    ],
+    [
+     1795561797.0,
+     "1410"
+    ],
+    [
+     1795561812.0,
+     "1275"
+    ],
+    [
+     1795561827.0,
+     "1275"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ],
+    [
+     1795561857.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "1410"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1290"
+    ],
+    [
+     1795561677.0,
+     "1290"
+    ],
+    [
+     1795561692.0,
+     "1275"
+    ],
+    [
+     1795561707.0,
+     "1275"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1410"
+    ],
+    [
+     1795561752.0,
+     "1410"
+    ],
+    [
+     1795561767.0,
+     "1410"
+    ],
+    [
+     1795561782.0,
+     "1410"
+    ],
+    [
+     1795561797.0,
+     "1410"
+    ],
+    [
+     1795561812.0,
+     "1260"
+    ],
+    [
+     1795561827.0,
+     "1260"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ],
+    [
+     1795561857.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "210"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1410"
+    ],
+    [
+     1795561677.0,
+     "1410"
+    ],
+    [
+     1795561692.0,
+     "1410"
+    ],
+    [
+     1795561707.0,
+     "1410"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1290"
+    ],
+    [
+     1795561752.0,
+     "1290"
+    ],
+    [
+     1795561767.0,
+     "1320"
+    ],
+    [
+     1795561782.0,
+     "1320"
+    ],
+    [
+     1795561797.0,
+     "1410"
+    ],
+    [
+     1795561812.0,
+     "1410"
+    ],
+    [
+     1795561827.0,
+     "1410"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_SM_CLOCK",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_DEV_SM_CLOCK",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "210"
+    ],
+    [
+     1795561542.0,
+     "210"
+    ],
+    [
+     1795561557.0,
+     "210"
+    ],
+    [
+     1795561572.0,
+     "210"
+    ],
+    [
+     1795561587.0,
+     "210"
+    ],
+    [
+     1795561602.0,
+     "210"
+    ],
+    [
+     1795561617.0,
+     "210"
+    ],
+    [
+     1795561632.0,
+     "210"
+    ],
+    [
+     1795561647.0,
+     "1410"
+    ],
+    [
+     1795561662.0,
+     "1410"
+    ],
+    [
+     1795561677.0,
+     "1410"
+    ],
+    [
+     1795561692.0,
+     "1410"
+    ],
+    [
+     1795561707.0,
+     "1410"
+    ],
+    [
+     1795561722.0,
+     "1410"
+    ],
+    [
+     1795561737.0,
+     "1275"
+    ],
+    [
+     1795561752.0,
+     "1275"
+    ],
+    [
+     1795561767.0,
+     "1410"
+    ],
+    [
+     1795561782.0,
+     "1410"
+    ],
+    [
+     1795561797.0,
+     "1410"
+    ],
+    [
+     1795561812.0,
+     "1410"
+    ],
+    [
+     1795561827.0,
+     "1410"
+    ],
+    [
+     1795561842.0,
+     "1410"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-4",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-8bvdw",
+    "UUID": "GPU-dbbdb7e7-8ed5-4a11-757b-6a296f9fae78",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-4",
+    "gpu": "0",
+    "instance": "10.244.67.70:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-8bvdw",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "29"
+    ],
+    [
+     1795561542.0,
+     "29"
+    ],
+    [
+     1795561557.0,
+     "29"
+    ],
+    [
+     1795561572.0,
+     "29"
+    ],
+    [
+     1795561587.0,
+     "29"
+    ],
+    [
+     1795561602.0,
+     "29"
+    ],
+    [
+     1795561617.0,
+     "29"
+    ],
+    [
+     1795561632.0,
+     "29"
+    ],
+    [
+     1795561647.0,
+     "34"
+    ],
+    [
+     1795561662.0,
+     "34"
+    ],
+    [
+     1795561677.0,
+     "38"
+    ],
+    [
+     1795561692.0,
+     "38"
+    ],
+    [
+     1795561707.0,
+     "40"
+    ],
+    [
+     1795561722.0,
+     "40"
+    ],
+    [
+     1795561737.0,
+     "41"
+    ],
+    [
+     1795561752.0,
+     "41"
+    ],
+    [
+     1795561767.0,
+     "42"
+    ],
+    [
+     1795561782.0,
+     "42"
+    ],
+    [
+     1795561797.0,
+     "48"
+    ],
+    [
+     1795561812.0,
+     "48"
+    ],
+    [
+     1795561827.0,
+     "44"
+    ],
+    [
+     1795561842.0,
+     "44"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-b9fhz",
+    "UUID": "GPU-fd274456-ce5d-c5be-3b84-232fdacab6d0",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-0",
+    "gpu": "0",
+    "instance": "10.244.217.3:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-b9fhz",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "30"
+    ],
+    [
+     1795561542.0,
+     "30"
+    ],
+    [
+     1795561557.0,
+     "30"
+    ],
+    [
+     1795561572.0,
+     "30"
+    ],
+    [
+     1795561587.0,
+     "30"
+    ],
+    [
+     1795561602.0,
+     "30"
+    ],
+    [
+     1795561617.0,
+     "30"
+    ],
+    [
+     1795561632.0,
+     "30"
+    ],
+    [
+     1795561647.0,
+     "35"
+    ],
+    [
+     1795561662.0,
+     "35"
+    ],
+    [
+     1795561677.0,
+     "39"
+    ],
+    [
+     1795561692.0,
+     "39"
+    ],
+    [
+     1795561707.0,
+     "41"
+    ],
+    [
+     1795561722.0,
+     "41"
+    ],
+    [
+     1795561737.0,
+     "47"
+    ],
+    [
+     1795561752.0,
+     "47"
+    ],
+    [
+     1795561767.0,
+     "48"
+    ],
+    [
+     1795561782.0,
+     "48"
+    ],
+    [
+     1795561797.0,
+     "43"
+    ],
+    [
+     1795561812.0,
+     "43"
+    ],
+    [
+     1795561827.0,
+     "43"
+    ],
+    [
+     1795561842.0,
+     "43"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-5",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-mcrkt",
+    "UUID": "GPU-dbea64ef-8833-60e9-0324-13d69b229243",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-5",
+    "gpu": "0",
+    "instance": "10.244.130.69:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-mcrkt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "35"
+    ],
+    [
+     1795561542.0,
+     "35"
+    ],
+    [
+     1795561557.0,
+     "35"
+    ],
+    [
+     1795561572.0,
+     "35"
+    ],
+    [
+     1795561587.0,
+     "35"
+    ],
+    [
+     1795561602.0,
+     "35"
+    ],
+    [
+     1795561617.0,
+     "35"
+    ],
+    [
+     1795561632.0,
+     "40"
+    ],
+    [
+     1795561647.0,
+     "40"
+    ],
+    [
+     1795561662.0,
+     "60"
+    ],
+    [
+     1795561677.0,
+     "60"
+    ],
+    [
+     1795561692.0,
+     "67"
+    ],
+    [
+     1795561707.0,
+     "67"
+    ],
+    [
+     1795561722.0,
+     "65"
+    ],
+    [
+     1795561737.0,
+     "65"
+    ],
+    [
+     1795561752.0,
+     "65"
+    ],
+    [
+     1795561767.0,
+     "65"
+    ],
+    [
+     1795561782.0,
+     "71"
+    ],
+    [
+     1795561797.0,
+     "71"
+    ],
+    [
+     1795561812.0,
+     "77"
+    ],
+    [
+     1795561827.0,
+     "77"
+    ],
+    [
+     1795561842.0,
+     "62"
+    ],
+    [
+     1795561857.0,
+     "62"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-3",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-rj9qm",
+    "UUID": "GPU-44451986-308c-41ac-15f5-aeffc87835e2",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-3",
+    "gpu": "0",
+    "instance": "10.244.168.197:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-rj9qm",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "40"
+    ],
+    [
+     1795561542.0,
+     "41"
+    ],
+    [
+     1795561557.0,
+     "41"
+    ],
+    [
+     1795561572.0,
+     "41"
+    ],
+    [
+     1795561587.0,
+     "41"
+    ],
+    [
+     1795561602.0,
+     "40"
+    ],
+    [
+     1795561617.0,
+     "40"
+    ],
+    [
+     1795561632.0,
+     "42"
+    ],
+    [
+     1795561647.0,
+     "42"
+    ],
+    [
+     1795561662.0,
+     "53"
+    ],
+    [
+     1795561677.0,
+     "53"
+    ],
+    [
+     1795561692.0,
+     "56"
+    ],
+    [
+     1795561707.0,
+     "56"
+    ],
+    [
+     1795561722.0,
+     "53"
+    ],
+    [
+     1795561737.0,
+     "53"
+    ],
+    [
+     1795561752.0,
+     "53"
+    ],
+    [
+     1795561767.0,
+     "53"
+    ],
+    [
+     1795561782.0,
+     "54"
+    ],
+    [
+     1795561797.0,
+     "54"
+    ],
+    [
+     1795561812.0,
+     "59"
+    ],
+    [
+     1795561827.0,
+     "59"
+    ],
+    [
+     1795561842.0,
+     "53"
+    ],
+    [
+     1795561857.0,
+     "53"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-2",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-tls48",
+    "UUID": "GPU-36d9072c-c8fd-94d3-e399-09d601db1862",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-2",
+    "gpu": "0",
+    "instance": "10.244.35.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-tls48",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "41"
+    ],
+    [
+     1795561542.0,
+     "41"
+    ],
+    [
+     1795561557.0,
+     "41"
+    ],
+    [
+     1795561572.0,
+     "41"
+    ],
+    [
+     1795561587.0,
+     "41"
+    ],
+    [
+     1795561602.0,
+     "41"
+    ],
+    [
+     1795561617.0,
+     "41"
+    ],
+    [
+     1795561632.0,
+     "43"
+    ],
+    [
+     1795561647.0,
+     "43"
+    ],
+    [
+     1795561662.0,
+     "54"
+    ],
+    [
+     1795561677.0,
+     "54"
+    ],
+    [
+     1795561692.0,
+     "57"
+    ],
+    [
+     1795561707.0,
+     "57"
+    ],
+    [
+     1795561722.0,
+     "55"
+    ],
+    [
+     1795561737.0,
+     "55"
+    ],
+    [
+     1795561752.0,
+     "56"
+    ],
+    [
+     1795561767.0,
+     "56"
+    ],
+    [
+     1795561782.0,
+     "56"
+    ],
+    [
+     1795561797.0,
+     "56"
+    ],
+    [
+     1795561812.0,
+     "60"
+    ],
+    [
+     1795561827.0,
+     "60"
+    ],
+    [
+     1795561842.0,
+     "55"
+    ],
+    [
+     1795561857.0,
+     "55"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-master-0",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-v9gqt",
+    "UUID": "GPU-788a06be-d4f4-0500-bcad-3d0cfd4846af",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-master-0",
+    "gpu": "0",
+    "instance": "10.244.122.5:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-v9gqt",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "28"
+    ],
+    [
+     1795561542.0,
+     "28"
+    ],
+    [
+     1795561557.0,
+     "28"
+    ],
+    [
+     1795561572.0,
+     "28"
+    ],
+    [
+     1795561587.0,
+     "28"
+    ],
+    [
+     1795561602.0,
+     "28"
+    ],
+    [
+     1795561617.0,
+     "28"
+    ],
+    [
+     1795561632.0,
+     "28"
+    ],
+    [
+     1795561647.0,
+     "35"
+    ],
+    [
+     1795561662.0,
+     "35"
+    ],
+    [
+     1795561677.0,
+     "38"
+    ],
+    [
+     1795561692.0,
+     "38"
+    ],
+    [
+     1795561707.0,
+     "40"
+    ],
+    [
+     1795561722.0,
+     "40"
+    ],
+    [
+     1795561737.0,
+     "45"
+    ],
+    [
+     1795561752.0,
+     "45"
+    ],
+    [
+     1795561767.0,
+     "47"
+    ],
+    [
+     1795561782.0,
+     "47"
+    ],
+    [
+     1795561797.0,
+     "43"
+    ],
+    [
+     1795561812.0,
+     "43"
+    ],
+    [
+     1795561827.0,
+     "42"
+    ],
+    [
+     1795561842.0,
+     "42"
+    ]
+   ]
+  },
+  {
+   "metric": "DCGM_FI_DEV_GPU_TEMP",
+   "pod": "pj-e1-n7-pythia410m-worker-1",
+   "labels": {
+    "DCGM_FI_DRIVER_VERSION": "595.71.05",
+    "Hostname": "nvidia-dcgm-exporter-zxc5r",
+    "UUID": "GPU-e0d18956-9084-3cf1-90fa-e3214bf42101",
+    "__name__": "DCGM_FI_DEV_GPU_TEMP",
+    "container": "nvidia-dcgm-exporter",
+    "device": "nvidia0",
+    "endpoint": "gpu-metrics",
+    "exported_container": "pytorch",
+    "exported_namespace": "default",
+    "exported_pod": "pj-e1-n7-pythia410m-worker-1",
+    "gpu": "0",
+    "instance": "10.244.74.68:9400",
+    "job": "nvidia-dcgm-exporter",
+    "modelName": "NVIDIA A100 80GB PCIe",
+    "namespace": "gpu-operator",
+    "pod": "nvidia-dcgm-exporter-zxc5r",
+    "service": "nvidia-dcgm-exporter"
+   },
+   "values": [
+    [
+     1795561527.0,
+     "40"
+    ],
+    [
+     1795561542.0,
+     "40"
+    ],
+    [
+     1795561557.0,
+     "40"
+    ],
+    [
+     1795561572.0,
+     "40"
+    ],
+    [
+     1795561587.0,
+     "40"
+    ],
+    [
+     1795561602.0,
+     "40"
+    ],
+    [
+     1795561617.0,
+     "40"
+    ],
+    [
+     1795561632.0,
+     "40"
+    ],
+    [
+     1795561647.0,
+     "45"
+    ],
+    [
+     1795561662.0,
+     "45"
+    ],
+    [
+     1795561677.0,
+     "49"
+    ],
+    [
+     1795561692.0,
+     "49"
+    ],
+    [
+     1795561707.0,
+     "51"
+    ],
+    [
+     1795561722.0,
+     "51"
+    ],
+    [
+     1795561737.0,
+     "57"
+    ],
+    [
+     1795561752.0,
+     "57"
+    ],
+    [
+     1795561767.0,
+     "55"
+    ],
+    [
+     1795561782.0,
+     "55"
+    ],
+    [
+     1795561797.0,
+     "54"
+    ],
+    [
+     1795561812.0,
+     "54"
+    ],
+    [
+     1795561827.0,
+     "54"
+    ],
+    [
+     1795561842.0,
+     "54"
+    ]
+   ]
+  }
+ ],
+ "summary": {
+  "DCGM_FI_DEV_GPU_UTIL": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 63.455,
+    "max": 100.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 63.364,
+    "max": 100.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 60.609,
+    "max": 100.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 51.826,
+    "max": 100.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 60.609,
+    "max": 100.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 54.182,
+    "max": 100.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 63.455,
+    "max": 100.0,
+    "samples": 22
+   }
+  },
+  "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 0.051,
+    "max": 0.127,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 0.051,
+    "max": 0.114,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 0.054,
+    "max": 0.123,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 0.053,
+    "max": 0.121,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 0.061,
+    "max": 0.119,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 0.053,
+    "max": 0.123,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 0.052,
+    "max": 0.12,
+    "samples": 22
+   }
+  },
+  "DCGM_FI_DEV_POWER_USAGE": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 97.121,
+    "max": 312.949,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 134.526,
+    "max": 311.182,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 134.854,
+    "max": 313.486,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 138.525,
+    "max": 304.869,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 141.483,
+    "max": 309.139,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 118.38,
+    "max": 298.304,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 101.046,
+    "max": 278.759,
+    "samples": 22
+   }
+  },
+  "DCGM_FI_DEV_FB_USED": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 14350.182,
+    "max": 23000.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 14350.182,
+    "max": 23000.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 14454.261,
+    "max": 23000.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 14454.261,
+    "max": 23000.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 14454.261,
+    "max": 23000.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 14636.636,
+    "max": 23000.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 14350.182,
+    "max": 23000.0,
+    "samples": 22
+   }
+  },
+  "DCGM_FI_DEV_SM_CLOCK": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 964.091,
+    "max": 1410.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 949.091,
+    "max": 1410.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 1023.913,
+    "max": 1410.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 1010.87,
+    "max": 1410.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 1009.565,
+    "max": 1410.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 954.545,
+    "max": 1410.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 961.364,
+    "max": 1410.0,
+    "samples": 22
+   }
+  },
+  "DCGM_FI_DEV_GPU_TEMP": {
+   "pj-e1-n7-pythia410m-worker-4": {
+    "mean": 36.636,
+    "max": 48.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-0": {
+    "mean": 37.818,
+    "max": 48.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-5": {
+    "mean": 54.739,
+    "max": 77.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-3": {
+    "mean": 49.13,
+    "max": 59.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-worker-2": {
+    "mean": 50.391,
+    "max": 60.0,
+    "samples": 23
+   },
+   "pj-e1-n7-pythia410m-master-0": {
+    "mean": 36.545,
+    "max": 47.0,
+    "samples": 22
+   },
+   "pj-e1-n7-pythia410m-worker-1": {
+    "mean": 47.727,
+    "max": 57.0,
+    "samples": 22
+   }
+  }
+ }
+}

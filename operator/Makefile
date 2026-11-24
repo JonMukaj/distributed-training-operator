@@ -278,6 +278,11 @@ archive-results: ## Copy the last run's JSON files off the PVC + dump its CR and
 		test -s $(RESULTS_DIR)/$(RUN)/history.yaml && echo "wrote history.yaml" || { rm -f $(RESULTS_DIR)/$(RUN)/history.yaml; echo "no history entry for $(CR) (HistorySkipped?)"; }
 	@ls -la $(RESULTS_DIR)/$(RUN)
 
+.PHONY: gpu-metrics
+gpu-metrics: ## Archive one run's GPU metrics from Prometheus into $(RESULTS_DIR)/$(RUN)/gpu_metrics.json. Needs the Prometheus port-forward. Usage: make gpu-metrics RUN=<run dir name>
+	@test -n "$(RUN)" || { echo "usage: make gpu-metrics RUN=<run dir name>"; exit 1; }
+	$(ANALYSIS_PY) ../script/gpu_metrics_archive.py --run $(RUN) --results $(RESULTS_DIR) --prom $(PROM_URL)
+
 .PHONY: restore-history
 restore-history: ## Recreate history CRs on the current cluster from $(RESULTS_DIR)/*/history.yaml (CRDs must exist). ONLY="run-a run-b", EXCLUDE="run-c", DRY=1 prints only. Skips warm-ups and duplicate archives.
 	$(ANALYSIS_PY) ../script/restore_history.py --results $(RESULTS_DIR) $(if $(ONLY),--only $(ONLY),) $(if $(EXCLUDE),--exclude $(EXCLUDE),) $(if $(DRY),--dry-run,)
@@ -371,6 +376,7 @@ monitoring-install: ## Install/upgrade Prometheus, Grafana, Pushgateway, the ope
 		--namespace monitoring --wait -f config/monitoring/values-pushgateway.yaml
 	kubectl apply -k config/grafana
 	kubectl apply -f config/monitoring/servicemonitor.yaml
+	kubectl apply -f config/monitoring/dcgm-servicemonitor.yaml
 	@echo "Grafana: make monitoring-grafana   (user admin / $(GRAFANA_PASSWORD))"
 
 .PHONY: monitoring-grafana
@@ -380,6 +386,7 @@ monitoring-grafana: ## Port-forward Grafana to http://localhost:3000.
 .PHONY: monitoring-uninstall
 monitoring-uninstall: ## Remove the monitoring stack AND the Prometheus PVC (detaches the Retain volume — run before destroying the cluster).
 	-kubectl delete -f config/monitoring/servicemonitor.yaml --ignore-not-found
+	-kubectl delete -f config/monitoring/dcgm-servicemonitor.yaml --ignore-not-found
 	-kubectl delete -k config/grafana --ignore-not-found
 	-helm uninstall pushgateway --namespace monitoring
 	-helm uninstall monitoring --namespace monitoring
@@ -421,6 +428,7 @@ replay-results: ## Push every archived run in $(RESULTS_DIR) into the local stac
 
 ANALYSIS_PY ?= ../script/venv/bin/python
 ANALYSIS_OUT ?= ../analysis_out
+PROM_URL ?= http://localhost:9090
 .PHONY: analyze
 analyze: ## Thesis tables and figures from $(RESULTS_DIR) into $(ANALYSIS_OUT). Optional: NETPROBE_GBIT=3.1 draws the iperf3 rate; ANALYSIS_PY=python3 outside the venv.
 	$(ANALYSIS_PY) ../script/analysis/analyze.py --results $(RESULTS_DIR) --out $(ANALYSIS_OUT) $(if $(NETPROBE_GBIT),--netprobe-gbit $(NETPROBE_GBIT),)

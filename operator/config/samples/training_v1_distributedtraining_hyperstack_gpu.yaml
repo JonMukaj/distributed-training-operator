@@ -227,11 +227,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -256,12 +256,12 @@ spec:
       - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -319,11 +319,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -348,12 +348,12 @@ spec:
       - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -382,8 +382,8 @@ spec:
         value: "1"
       - name: NCCL_DEBUG
         value: INFO
-      - name: NCCL_DEBUG_SUBSYS
-        value: TUNING
+      # - name: NCCL_DEBUG_SUBSYS
+      #   value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # e1-n5: Pythia-410M FULL fine-tuning, 5 nodes — AllReduce overhead in isolation (random tokens, no storage reads).
@@ -399,7 +399,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e1-n5
   topology:
     nodes: 5
@@ -412,11 +412,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -441,12 +441,12 @@ spec:
       - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -492,7 +492,7 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e1-n7
   topology:
     nodes: 7
@@ -505,11 +505,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -534,12 +534,12 @@ spec:
       - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -585,9 +585,8 @@ spec:
   backend: pytorch
   hardware:
     type: gpu
-    machineType: n3-L40x1
+    machineType: n3-A100x1-spot # n3-L40x1
     nodePoolName: dj-e1-n10
-
   topology:
     nodes: 10
     processesPerNode: 1
@@ -599,11 +598,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -628,12 +627,12 @@ spec:
       - --max_train_samples=35840
       - --max_eval_samples=1000
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
+      - --gradient_accumulation_steps=16   # see header: shrinks AllReduces per sample 64x so the series sits in a measurable scaling regime
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -711,11 +710,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -742,12 +741,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -804,11 +803,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -835,12 +834,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -899,11 +898,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -930,12 +929,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -994,11 +993,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1025,12 +1024,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1089,11 +1088,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1120,12 +1119,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1196,11 +1195,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1227,12 +1226,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1                 # few optimizer steps now (156/78/39); a fixed 50 would exceed them
       - --logging_steps=5
@@ -1301,11 +1300,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1332,12 +1331,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1
       - --logging_steps=5
@@ -1404,11 +1403,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1435,12 +1434,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1
       - --logging_steps=5
@@ -1503,11 +1502,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1534,12 +1533,12 @@ spec:
       - --max_eval_samples=1000
       - --validation_split_percentage=0.2
       - --use_lora=false
-      - --per_device_train_batch_size=4
+      - --per_device_train_batch_size=16
       - --per_device_eval_batch_size=8
       - --learning_rate=2e-5
       - --num_train_epochs=1
       - --max_steps=-1
-      - --gradient_accumulation_steps=64
+      - --gradient_accumulation_steps=16
       - --max_grad_norm=1.0
       - --warmup_ratio=0.1
       - --logging_steps=5
@@ -1600,11 +1599,11 @@ spec:
     name: synthetic
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1629,12 +1628,12 @@ spec:
     - --max_train_samples=35840
     - --max_eval_samples=1000
     - --use_lora=false
-    - --per_device_train_batch_size=4
+    - --per_device_train_batch_size=16
     - --per_device_eval_batch_size=8
     - --learning_rate=2e-5
     - --num_train_epochs=1
     - --max_steps=-1
-    - --gradient_accumulation_steps=64
+    - --gradient_accumulation_steps=16
     - --max_grad_norm=1.0
     - --warmup_ratio=0.1
     - --logging_steps=5
@@ -1664,8 +1663,8 @@ spec:
       value: "1"
     - name: NCCL_DEBUG
       value: INFO
-    - name: NCCL_DEBUG_SUBSYS
-      value: TUNING
+    # - name: NCCL_DEBUG_SUBSYS
+    #   value: TUNING
 ---
 # ---------------------------------------------------------------------------
 # E4 : bf16 gradient exchange, counterpart of E2, 2 nodes
@@ -1696,11 +1695,11 @@ spec:
     name: wikitext/wikitext-103-raw-v1
     split: train
   training:
-    batchSize: 4
+    batchSize: 16
     learningRate: "2e-5"
     epochs: 1
     maxSteps: -1
-    gradAccumulationSteps: 64
+    gradAccumulationSteps: 16
     ddpBackend: nccl
   optimization:
     mixedPrecision: bf16
@@ -1727,12 +1726,12 @@ spec:
     - --max_eval_samples=1000
     - --validation_split_percentage=0.2
     - --use_lora=false
-    - --per_device_train_batch_size=4
+    - --per_device_train_batch_size=16
     - --per_device_eval_batch_size=8
     - --learning_rate=2e-5
     - --num_train_epochs=1
     - --max_steps=-1
-    - --gradient_accumulation_steps=64
+    - --gradient_accumulation_steps=16
     - --max_grad_norm=1.0
     - --warmup_ratio=0.1
     - --logging_steps=5

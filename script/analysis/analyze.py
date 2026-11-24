@@ -41,7 +41,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 import solver_whatif as sw  # noqa: E402  (same estimator as the operator)
 
-PRICES = {"n3-L40x1": 1.00, "n3-A100x1": 1.35, "c4-highcpu-8": 0.35}
+PRICES = {"n3-L40x1": 1.00, "n3-A100x1": 1.35, "n3-A100x1-spot": 1.08, "c4-highcpu-8": 0.35}
 COMPUTE_BOUND = 0.6
 # An AllReduce bandwidth above this cannot have crossed the Hyperstack network (25 Gbit/s); it means the
 # timer measured kernel enqueue, not completion (found 2026-11-06: 370 GB/s on a ~0.4 GB/s link).
@@ -446,6 +446,13 @@ def build_tables(runs, results, T):
           ["series", "n", "runs", "which", "mean training", "spread (max-min)/mean", "allreduce fraction spread"], var,
           note="needs two runs of the same configuration (e2-n2 and e2-n2-rep)")
 
+    # GPU metrics, when archived
+    gpu = load_gpu(results)
+    T.add("gpu_metrics", "GPU metrics per run (from the DCGM exporter)",
+          ["run", "metric", "pods", "mean", "max"], gpu_summary_rows(gpu),
+          note="needs results/<RUN>/gpu_metrics.json (make gpu-metrics RUN=<run>)",
+          foot="Busy time overstates compute use; tensor-core activity is the closer measure. Compare with the MFU estimate.")
+
     # lifecycle
     life = []
     pv = [r for r in rs if r["prov_s"]]
@@ -708,6 +715,63 @@ def fig_provisioning(runs, out):
 
 
 # --------------------------------------------------------------------------------------
+# GPU metrics (results/<RUN>/gpu_metrics.json, written by script/gpu_metrics_archive.py)
+# --------------------------------------------------------------------------------------
+GPU_PANELS = [("DCGM_FI_DEV_GPU_UTIL", "GPU busy time (%)", 1.0),
+              ("DCGM_FI_PROF_PIPE_TENSOR_ACTIVE", "Tensor core activity (%)", 100.0),
+              ("DCGM_FI_DEV_POWER_USAGE", "Power (W)", 1.0),
+              ("DCGM_FI_DEV_FB_USED", "Framebuffer used (GiB)", 1 / 1024)]
+
+
+def load_gpu(results):
+    """run name -> parsed gpu_metrics.json, for runs that have one."""
+    out = {}
+    for f in sorted(Path(results).glob("*/gpu_metrics.json")):
+        try:
+            out[f.parent.name] = json.loads(f.read_text())
+        except (OSError, ValueError):
+            print(f"[warn] unreadable {f}")
+    return out
+
+
+def gpu_summary_rows(gpu):
+    rows = []
+    for run, g in gpu.items():
+        for metric, label, scale in GPU_PANELS:
+            pods = [s for s in g["series"] if s["metric"] == metric]
+            if not pods:
+                continue
+            vals = [float(v) * scale for s in pods for _, v in s["values"]]
+            rows.append([run, label.split(" (")[0], len(pods), fmt(sum(vals) / len(vals), 1),
+                         fmt(max(vals), 1)])
+    return rows
+
+
+def fig_gpu_timeline(gpu, out):
+    import matplotlib.pyplot as plt
+    if not gpu:
+        return print("[skip] fig_gpu_timeline: no gpu_metrics.json archived")
+    fig, axes = plt.subplots(len(GPU_PANELS), 1, figsize=(8, 2.1 * len(GPU_PANELS)), sharex=False)
+    for ax, (metric, label, scale) in zip(axes, GPU_PANELS):
+        for i, (run, g) in enumerate(sorted(gpu.items())):
+            for j, s in enumerate(x for x in g["series"] if x["metric"] == metric):
+                if not s["values"]:
+                    continue
+                t0 = s["values"][0][0]
+                xs = [(t - t0) / 60 for t, _ in s["values"]]
+                ys = [float(v) * scale for _, v in s["values"]]
+                ax.plot(xs, ys, color=SLOT[i % 3], linewidth=1.6, alpha=1.0 if j == 0 else 0.6,
+                        label=run if j == 0 else None)
+        ax.set_ylabel(label, fontsize=8)
+        ax.set_xlabel("minutes into training", fontsize=8)
+        ax.set_ylim(bottom=0)
+    axes[0].legend(fontsize=7, loc="lower right")
+    fig.suptitle("GPU metrics per run (from Prometheus, DCGM exporter)", fontsize=10, x=0.02, ha="left")
+    fig.tight_layout()
+    save(fig, out, "fig_gpu_timeline")
+
+
+# --------------------------------------------------------------------------------------
 RUNLOG_HEADER = ["date", "run", "series", "kind", "n", "provisioning", "training", "inner loop",
                  "samples/s (wall)", "alpha (wall)", "bottleneck", "eval loss", "cost $", "anomalies"]
 
@@ -776,6 +840,7 @@ def main():
         fig_solver(runs, a.results, out)
         fig_cost(runs, out)
         fig_provisioning(runs, out)
+        fig_gpu_timeline(load_gpu(a.results), out)
     print(f"written to {out}")
 
 

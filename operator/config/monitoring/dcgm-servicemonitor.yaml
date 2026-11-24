@@ -1,0 +1,24 @@
+# Scrapes the NVIDIA DCGM exporter that the GPU operator runs on every GPU node
+# (namespace gpu-operator, pods labelled app=nvidia-dcgm-exporter). Gives the
+# DCGM_FI_* metrics (GPU utilization, SM activity) to Prometheus, so per-run GPU
+# utilization can be queried. Applied by `make monitoring-install`.
+# The port name `gpu-metrics` is the GPU operator's default for the exporter service;
+# check it on a cluster with: kubectl -n gpu-operator get svc -l app=nvidia-dcgm-exporter -o yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  endpoints:
+    - port: gpu-metrics
+      path: /metrics
+      interval: 15s
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  namespaceSelector:
+    matchNames:
+      - gpu-operator

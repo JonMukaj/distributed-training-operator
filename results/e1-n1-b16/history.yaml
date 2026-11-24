@@ -1,0 +1,59 @@
+apiVersion: v1
+items:
+- apiVersion: training.distributedtraining.io/v1
+  kind: DistributedTrainingHistory
+  metadata:
+    creationTimestamp: "2026-11-24T22:06:58Z"
+    generateName: djh-e1-n1-pythia410m-
+    generation: 1
+    labels:
+      config-hash: e43e19e7e52416433bed594069e37be55f352cb786e97ceea755a9d19f01674
+    name: djh-e1-n1-pythia410m-4kfz9
+    namespace: default
+    resourceVersion: "35463"
+    uid: b9400114-5c7e-409a-87cc-1a715a06d750
+  spec:
+    allReduceBandwidthMBs: "0.0000"
+    allReduceFraction: "0.000000"
+    backend: pytorch
+    computeFraction: "0.985527"
+    configHash: e43e19e7e52416433bed594069e37be55f352cb786e97ceea755a9d19f01674
+    dataloadFraction: "0.014340"
+    gradSizeBytes: 1621336064
+    machineType: n3-A100x1-spot
+    nfsReadBandwidthMBs: "0.1312"
+    nodes: 1
+    provisioningSeconds: "323"
+    throughput: 77913043479n
+    totalWork: "35840"
+    trainingSeconds: "460"
+- apiVersion: training.distributedtraining.io/v1
+  kind: DistributedTrainingHistory
+  metadata:
+    creationTimestamp: "2026-11-24T21:01:58Z"
+    generateName: djh-e1-n1-pythia410m-batch64-
+    generation: 1
+    labels:
+      config-hash: 974b61d4aa25b83d1065d882adb7c38ad0445103519d842bee4435fbb7e243b
+    name: djh-e1-n1-pythia410m-batch64-m8267
+    namespace: default
+    resourceVersion: "17354"
+    uid: 00446d88-f097-4535-ac71-f22eefed0b59
+  spec:
+    allReduceBandwidthMBs: "0.0000"
+    allReduceFraction: "0.000000"
+    backend: pytorch
+    computeFraction: "0.999119"
+    configHash: 974b61d4aa25b83d1065d882adb7c38ad0445103519d842bee4435fbb7e243b
+    dataloadFraction: "0.000774"
+    gradSizeBytes: 1621336064
+    machineType: n3-A100x1-spot
+    nfsReadBandwidthMBs: "2.7349"
+    nodes: 1
+    provisioningSeconds: "324"
+    throughput: 85130641331n
+    totalWork: "35840"
+    trainingSeconds: "421"
+kind: List
+metadata:
+  resourceVersion: ""

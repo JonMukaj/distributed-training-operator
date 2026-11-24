@@ -629,13 +629,12 @@ Each experiment is one CR, selected by its `experiment` label. Run them one at a
 make run-experiment EXP=<label>
 make hs-watch                                   # wait for Succeeded
 make hs-archive-results CR=<cr-name> RUN=<run>  # keeps the JSON, the CR and the history entry
+make gpu-metrics RUN=<run>
 make runlog                                     # one row per archived run, with validity flags
 ```
 
 - **Warm-up:** on a fresh cluster, run the first experiment of a series once as a warm-up, archive it with a `-warmup`
   suffix, and delete its history entry. Analysis skips these runs.
-- **Algorithm check:** multi-node CRs log NCCL's choice through the `TUNING` subsystem. The master log line
-  `33554432 Bytes -> Algo <n> proto <m>` gives the choice for the 32 MiB bucket. Algo 1 is Ring and proto 2 is Simple.
 - **Objective runs:** set `targetTime` with `script/solver_whatif.py` before applying the CR.
 
 **4. Analyse and rebuild**
